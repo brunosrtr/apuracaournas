@@ -11,6 +11,8 @@ interface Lado {
   primeiro: number | undefined;
 }
 
+// Linguagem visual usada no cartão inteiro: APURADO (votos já contados pelo TSE) é sólido;
+// PROJEÇÃO (estimativa do resultado final) é tracejada/listrada e sempre traz a margem de erro.
 function CartaoCandidato({ lado, estado, direita, temVotos }: { lado: Lado; estado: EstadoCorrida; direita?: boolean; temVotos: boolean }) {
   const { c, pj } = lado;
   const favorito = (pj?.probVitoria ?? 0) >= 0.5;
@@ -23,21 +25,26 @@ function CartaoCandidato({ lado, estado, direita, temVotos }: { lado: Lado; esta
           <div className="faf-partido">{c.numero} · {c.partido}</div>
         </div>
       </div>
-      <div className="faf-rotulo">{pj ? 'Projeção final' : 'Apurado'}</div>
-      <div className="faf-numero num" style={{ color: c.cor }}>
-        {pj ? fmtPct(pj.media, 1) : temVotos ? fmtPct(lado.apurado, 2) : '—'}
-        {pj && <small>±{'\u00a0'}{fmtPP(pj.margem95)}</small>}
-      </div>
-      <div className="faf-detalhe num">
-        {pj && <div>apurado <strong>{fmtPct(lado.apurado, 2)}</strong></div>}
-        <div className="muted">{temVotos ? `${fmtInt(lado.votos)} votos` : 'aguardando votos'}</div>
-        {lado.primeiro !== undefined && <div className="muted">1º turno: {fmtPct(lado.primeiro, 1)}</div>}
-      </div>
-      {pj && (
-        <div className={`faf-chance${favorito ? ' favorito' : ''}`} style={favorito ? { background: c.cor } : undefined}>
-          <span className="faf-chance-rotulo">Chance de vitória</span><span className="faf-chance-curto">Chance</span> <strong className="num">{fmtProb(pj.probVitoria)}</strong>
+      <div className="faf-blocos">
+        <div className="faf-bloco apurado">
+          <div className="faf-rotulo">Apurado agora</div>
+          <div className="faf-numero num" style={{ color: c.cor }}>{temVotos ? fmtPct(lado.apurado, 2) : '—'}</div>
+          <div className="faf-detalhe num">{temVotos ? `${fmtInt(lado.votos)} votos` : 'aguardando votos'}</div>
         </div>
-      )}
+        <div className="faf-bloco projecao">
+          <div className="faf-rotulo">Projeção final <span className="faf-selo">estimativa</span></div>
+          <div className="faf-numero num" style={{ color: c.cor }}>
+            {pj ? fmtPct(pj.media, 1) : '—'}
+            {pj && <small>±{'\u00a0'}{fmtPP(pj.margem95)}</small>}
+          </div>
+          {pj ? (
+            <div className={`faf-chance${favorito ? ' favorito' : ''}`} style={favorito ? { background: c.cor } : undefined}>
+              <span className="faf-chance-rotulo">Chance de vitória</span><span className="faf-chance-curto">Chance</span> <strong className="num">{fmtProb(pj.probVitoria)}</strong>
+            </div>
+          ) : <div className="faf-detalhe">sai com os primeiros votos</div>}
+        </div>
+      </div>
+      {lado.primeiro !== undefined && <div className="faf-detalhe muted num">1º turno: {fmtPct(lado.primeiro, 1)}</div>}
     </div>
   );
 }
@@ -61,6 +68,7 @@ export function FrenteAFrente({ estado }: { estado: EstadoCorrida }) {
   const [a, b] = lados;
   const temVotos = t.validos > 0;
   const pos = (v: number) => `${(100 * Math.min(1, Math.max(0, v))).toFixed(2)}%`;
+  const listras = (cor: string) => `repeating-linear-gradient(135deg, ${cor} 0 7px, color-mix(in srgb, ${cor} 45%, var(--surface)) 7px 12px)`;
 
   // quanto o candidato atrás no parcial precisa dos válidos restantes para virar. Vem do
   // servidor (calculado sobre a mesma apuração da projeção), para não misturar uma contagem
@@ -85,27 +93,36 @@ export function FrenteAFrente({ estado }: { estado: EstadoCorrida }) {
         <CartaoCandidato lado={b} estado={estado} direita temVotos={temVotos} />
       </div>
 
-      <div className="faf-barra" aria-label={`Apurado: ${titulo(a.c.nome)} ${fmtPct(a.apurado, 1)}, ${titulo(b.c.nome)} ${fmtPct(b.apurado, 1)}`}>
-        <div className="faf-trilho">
-          {temVotos ? (
-            <>
-              <div className="faf-seg" style={{ width: pos(a.apurado), background: a.c.cor }} />
-              <div className="faf-seg" style={{ width: pos(b.apurado), background: b.c.cor }} />
-            </>
-          ) : <div className="faf-seg vazio" style={{ width: '100%' }} />}
+      <div className="faf-barras">
+        <div className="faf-barra-rotulo">Apurado agora</div>
+        <div className="faf-barra" aria-label={temVotos ? `Apurado agora: ${titulo(a.c.nome)} ${fmtPct(a.apurado, 1)}, ${titulo(b.c.nome)} ${fmtPct(b.apurado, 1)}` : 'Apurado agora: aguardando votos'}>
+          <div className="faf-trilho">
+            {temVotos ? (
+              <>
+                <div className="faf-seg" style={{ width: pos(a.apurado), background: a.c.cor }} />
+                <div className="faf-seg" style={{ width: pos(b.apurado), background: b.c.cor }} />
+              </>
+            ) : <div className="faf-seg vazio" style={{ width: '100%' }} />}
+          </div>
+          <div className="faf-meio"><span>50%</span></div>
         </div>
-        {a.pj && (
-          <>
-            <div className="faf-faixa" style={{ left: pos(a.pj.p025), width: `calc(${pos(a.pj.p975)} - ${pos(a.pj.p025)})` }} />
-            <div className="faf-marcador" style={{ left: pos(a.pj.media) }} title={`Projeção: ${fmtPct(a.pj.media, 2)}`} />
-          </>
-        )}
-        <div className="faf-meio"><span>50%</span></div>
+        <div className="faf-barra-rotulo">Projeção final</div>
+        <div className="faf-barra" aria-label={a.pj && b.pj ? `Projeção final: ${titulo(a.c.nome)} ${fmtPct(a.pj.media, 1)}, ${titulo(b.c.nome)} ${fmtPct(b.pj.media, 1)}` : 'Projeção final: aguardando os primeiros votos'}>
+          <div className="faf-trilho">
+            {a.pj && b.pj ? (
+              <>
+                <div className="faf-seg" style={{ width: pos(a.pj.media), background: listras(a.c.cor) }} />
+                <div className="faf-seg" style={{ width: pos(b.pj.media), background: listras(b.c.cor) }} />
+              </>
+            ) : <div className="faf-seg vazio" style={{ width: '100%' }} />}
+          </div>
+          {a.pj && <div className="faf-faixa" style={{ left: pos(a.pj.p025), width: `calc(${pos(a.pj.p975)} - ${pos(a.pj.p025)})` }} title="Margem de erro (95%)" />}
+          <div className="faf-meio" />
+        </div>
       </div>
       <div className="faf-legenda">
-        <span><i style={{ background: 'var(--text-2)' }} />barra: apurado</span>
-        {a.pj && <span><i className="marcador" />projeção de {titulo(a.c.nome).split(' ')[0]}</span>}
-        {a.pj && <span><i className="faixa" />margem de erro (95%)</span>}
+        <span><i className="solido" /><strong>Apurado</strong>: votos já contados pelo TSE</span>
+        <span><i className="listrado" /><strong>Projeção</strong>: estimativa do resultado final{a.pj ? ', com margem de erro (95%)' : ''}</span>
       </div>
 
       <div className="faf-kpis">
