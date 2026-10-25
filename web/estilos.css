@@ -339,7 +339,8 @@ tr:hover td { background: var(--surface-2); }
 .faf-id { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .faf-lado.direita .faf-id { flex-direction: row-reverse; }
 .faf-id .foto { grid-row: auto; box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--border); }
-.faf-nome { font-size: 20px; font-weight: 750; letter-spacing: -0.02em; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* o nome quebra em até duas linhas em vez de ser cortado ("Flavio Bols…") */
+.faf-nome { font-size: 20px; font-weight: 750; letter-spacing: -0.02em; line-height: 1.15; overflow-wrap: anywhere; }
 .faf-partido { font-size: 12.5px; color: var(--muted); }
 .faf-rotulo { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 650; margin-top: 8px; }
 .faf-numero { font-size: 52px; font-weight: 800; letter-spacing: -0.04em; line-height: 1; white-space: nowrap; }
@@ -384,8 +385,7 @@ tr:hover td { background: var(--surface-2); }
   .faf-chance { font-size: 12px; padding: 3px 9px; }
   .faf-chance-rotulo { display: none; }
   .faf-chance-curto { display: inline; }
-  /* nome inteiro em até duas linhas, em vez de cortar ("Flavio Bols…") */
-  .faf-nome { font-size: 16px; white-space: normal; overflow-wrap: anywhere; }
+  .faf-nome { font-size: 16px; }
   .faf-id .foto { width: 44px !important; height: 44px !important; }
   /* mesma altura dos dois lados, para os números ficarem alinhados mesmo com o nome em duas linhas */
   .faf-id { min-height: 58px; }
