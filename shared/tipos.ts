@@ -26,6 +26,8 @@ export interface RegistroHistorico {
 
 export interface BasePresidente {
   ano: number;
+  /** turno a que os votos se referem */
+  turno: number;
   /** número do vencedor do 2º turno (referência da variável de 2º turno) */
   vencedor2T: string;
   candidatos: { numero: string; nome: string; partido: string; votos: number }[];
@@ -52,6 +54,8 @@ export interface CorridaInfo {
   titulo: string;
   /** ano da eleição usada como comparação ("vs 2022") */
   anoAnterior: number;
+  /** rótulo da comparação: "2022" ou "1º turno" */
+  rotuloAnterior: string;
 }
 
 export interface Contagem {
@@ -236,8 +240,6 @@ export interface StatusServidor {
     disponivel: boolean;
     pleito: string;
     corrida: CorridaInfo | null;
-    /** código da eleição estadual (Governador e Senador), se houver */
-    eleicaoEstadual: number | null;
     ultimaColeta: number | null;
     /** intervalo entre consultas automáticas ao TSE (ms) */
     intervaloColetaMs: number;
@@ -245,6 +247,8 @@ export interface StatusServidor {
     requisicoes: number;
   };
   simulacao: {
+    /** falso em produção: os controles ficam escondidos e a API recusa comandos */
+    controlavel: boolean;
     ativa: boolean;
     relogio: string | null;
     velocidade: number;
@@ -259,75 +263,6 @@ export interface Chamada {
   status: StatusChamada;
   titulo: string;
   detalhe: string;
-}
-
-// ------------------------------------------------------------ resumo por partido (Governador e Senado)
-export type Bloco = 'esquerda' | 'centro' | 'direita';
-
-export interface DesempenhoGovernador {
-  candidatos: number;
-  votos: number;
-  fracaoVotos: number;
-  /** número esperado de estados em que termina em 1º no 1º turno */
-  estadosEm1: number;
-  /** número esperado de eleitos no 1º turno */
-  eleitos1T: number;
-  /** número esperado de candidatos no 2º turno */
-  em2T: number;
-}
-
-export interface DesempenhoSenado {
-  candidatos: number;
-  votos: number;
-  fracaoVotos: number;
-  /** cadeiras esperadas e intervalo de 80% */
-  cadeiras: number;
-  cadeirasP10: number;
-  cadeirasP90: number;
-}
-
-export interface DesempenhoPartido {
-  partido: string;
-  numero: string;
-  bloco: Bloco;
-  governador: DesempenhoGovernador;
-  senado: DesempenhoSenado;
-}
-
-export interface DesempenhoBloco {
-  bloco: Bloco;
-  governador: DesempenhoGovernador;
-  senado: DesempenhoSenado;
-}
-
-export interface CandidatoResumoUf {
-  numero: string;
-  nome: string;
-  partido: string;
-  bloco: Bloco;
-  media: number;
-  probPrimeiro: number;
-  probVitoria: number;
-  probSegundoTurno: number;
-}
-
-export interface ResumoPartidosUf {
-  uf: string;
-  nome: string;
-  pstGovernador: number;
-  pstSenado: number;
-  governador: CandidatoResumoUf[];
-  senado: CandidatoResumoUf[];
-}
-
-export interface ResumoPartidos {
-  calculadoEm: number;
-  /** disputas com projeção disponível */
-  comProjecao: { governador: number; senado: number };
-  vagasSenado: number;
-  partidos: DesempenhoPartido[];
-  blocos: DesempenhoBloco[];
-  estados: ResumoPartidosUf[];
 }
 
 // ------------------------------------------------------------ insights (a cada 5% apurado ou sob demanda)

@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import type { Candidato, EstadoCorrida, ProjecaoCandidato } from '../../shared/tipos.ts';
 import { fmtCompacto, fmtInt, fmtPct, fmtPP, fmtProb, iniciais, titulo } from '../formato.ts';
+import { BASE_API } from '../cliente.ts';
 
 export function Foto({ c, estado, tamanho = 48 }: { c: Candidato; estado: EstadoCorrida; tamanho?: number }) {
   const [falhou, setFalhou] = useState(false);
   const url = estado.corrida.modo === 'ao-vivo' && c.sqcand && !falhou
-    ? `/api/foto/${estado.corrida.eleicao}/${estado.corrida.abrangencia}/${c.sqcand}`
+    ? `${BASE_API}/api/foto/${estado.corrida.eleicao}/${estado.corrida.abrangencia}/${c.sqcand}`
     : null;
   return (
     <div className="foto" style={{ background: c.cor, width: tamanho, height: tamanho }} aria-hidden>

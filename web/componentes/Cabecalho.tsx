@@ -39,7 +39,7 @@ export function Cabecalho({ modo, aoMudarModo, estado, conectado, agora, tema, a
           </div>
           <div>
             <h1>Apuração · Presidente</h1>
-            <small>{modo === 'simulacao' ? 'Simulação do 1º turno de 2022' : `Eleições 2026 · ${estado?.corrida.turno ?? 1}º turno`}</small>
+            <small>{modo === 'simulacao' ? `Simulação do ${estado?.corrida.turno ?? 2}º turno de 2022` : `Eleições 2026 · ${estado?.corrida.turno ?? 2}º turno`}</small>
           </div>
         </div>
         {pilula}

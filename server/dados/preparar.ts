@@ -6,7 +6,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { registrosDoZip } from './zipremoto.ts';
-import { ANOS_BASE_AO_VIVO, ANOS_BASE_SIMULACAO, DIR_BASE, DIR_GEO, UF_POR_CODIGO_IBGE, URL_TSE } from '../config.ts';
+import { ANOS_HISTORICO, DIR_BASE, DIR_GEO, UF_POR_CODIGO_IBGE, URL_TSE } from '../config.ts';
 import type { BasePresidente, MunicipioBase, RegistroHistorico } from '../../shared/tipos.ts';
 
 const ODSELE = 'https://cdn.tse.jus.br/estatistica/sead/odsele';
@@ -63,41 +63,39 @@ async function prepararMunicipios(): Promise<Record<string, MunicipioBase>> {
 /** Vencedor de cada 2º turno (referência da variável "2º turno"). */
 const VENCEDOR_2T: Record<number, string> = { 2014: '13', 2018: '17', 2022: '13' };
 
-async function prepararPresidente(ano: number): Promise<BasePresidente> {
+type Registros = Record<string, RegistroHistorico>;
+type Cands = Map<string, { numero: string; nome: string; partido: string; votos: number }>;
+
+/** Presidente por município: 1º turno e, quando houver, 2º turno (cada um como base própria). */
+async function prepararPresidente(ano: number): Promise<{ t1: BasePresidente; t2: BasePresidente | null }> {
   console.log(`• Presidente ${ano} por município`);
-  const mun: Record<string, RegistroHistorico> = {};
-  const segundo: Record<string, { a: number; total: number }> = {};
-  const cands = new Map<string, { numero: string; nome: string; partido: string; votos: number }>();
-  const vencedor2T = VENCEDOR_2T[ano];
+  const mun: [Registros, Registros] = [{}, {}];
+  const cands: [Cands, Cands] = [new Map(), new Map()];
+  const vencedor2T = VENCEDOR_2T[ano] ?? '';
 
   for await (const r of registrosDoZip(
     `${ODSELE}/votacao_candidato_munzona/votacao_candidato_munzona_${ano}.zip`,
     (n) => n.endsWith(`_${ano}_BR.csv`),
   )) {
-    if (r.CD_CARGO !== '1') continue;
+    if (r.CD_CARGO !== '1' || (r.NR_TURNO !== '1' && r.NR_TURNO !== '2')) continue;
+    const t = r.NR_TURNO === '2' ? 1 : 0;
     const cd = codMun(r.CD_MUNICIPIO);
     const votos = num(r, 'QT_VOTOS_NOMINAIS_VALIDOS', 'QT_VOTOS_NOMINAIS');
     const numero = r.NR_CANDIDATO;
-    if (r.NR_TURNO === '2') {
-      const s = (segundo[cd] ??= { a: 0, total: 0 });
-      s.total += votos;
-      if (numero === vencedor2T) s.a += votos;
-      continue;
-    }
-    const reg = (mun[cd] ??= { uf: r.SG_UF.toLowerCase(), aptos: 0, comp: 0, brancos: 0, nulos: 0, validos: 0, v: {} });
+    const reg = (mun[t][cd] ??= { uf: r.SG_UF.toLowerCase(), aptos: 0, comp: 0, brancos: 0, nulos: 0, validos: 0, v: {} });
     reg.v[numero] = (reg.v[numero] ?? 0) + votos;
     reg.validos += votos;
-    const c = cands.get(numero) ?? { numero, nome: r.NM_URNA_CANDIDATO, partido: r.SG_PARTIDO, votos: 0 };
+    const c = cands[t].get(numero) ?? { numero, nome: r.NM_URNA_CANDIDATO, partido: r.SG_PARTIDO, votos: 0 };
     c.votos += votos;
-    cands.set(numero, c);
+    cands[t].set(numero, c);
   }
 
   for await (const r of registrosDoZip(
     `${ODSELE}/detalhe_votacao_munzona/detalhe_votacao_munzona_${ano}.zip`,
     (n) => n.endsWith(`_${ano}_BR.csv`),
   )) {
-    if (r.CD_CARGO !== '1' || r.NR_TURNO !== '1') continue;
-    const reg = mun[codMun(r.CD_MUNICIPIO)];
+    if (r.CD_CARGO !== '1' || (r.NR_TURNO !== '1' && r.NR_TURNO !== '2')) continue;
+    const reg = mun[r.NR_TURNO === '2' ? 1 : 0][codMun(r.CD_MUNICIPIO)];
     if (!reg) continue;
     reg.aptos += num(r, 'QT_APTOS');
     reg.comp += num(r, 'QT_COMPARECIMENTO');
@@ -105,12 +103,19 @@ async function prepararPresidente(ano: number): Promise<BasePresidente> {
     reg.nulos += num(r, 'QT_TOTAL_VOTOS_NULOS', 'QT_VOTOS_NULOS');
   }
 
-  for (const [cd, s] of Object.entries(segundo)) {
-    if (mun[cd] && s.total > 0) mun[cd].seg = s.a / s.total;
+  // variável "2º turno" da base do 1º turno: fração do vencedor no 2º turno
+  for (const [cd, r2] of Object.entries(mun[1])) {
+    if (mun[0][cd] && r2.validos > 0 && vencedor2T) mun[0][cd].seg = (r2.v[vencedor2T] ?? 0) / r2.validos;
   }
-  const candidatos = [...cands.values()].sort((a, b) => b.votos - a.votos);
-  console.log(`  ${Object.keys(mun).length} municípios; ${candidatos.map((c) => `${c.nome} ${c.votos.toLocaleString('pt-BR')}`).slice(0, 4).join(' · ')}`);
-  return { ano, vencedor2T, candidatos, municipios: mun };
+  const lista = (c: Cands) => [...c.values()].sort((a, b) => b.votos - a.votos);
+  const t1: BasePresidente = { ano, turno: 1, vencedor2T, candidatos: lista(cands[0]), municipios: mun[0] };
+  const t2: BasePresidente | null = Object.keys(mun[1]).length
+    ? { ano, turno: 2, vencedor2T, candidatos: lista(cands[1]), municipios: mun[1] }
+    : null;
+  const resumo = (b: BasePresidente) => b.candidatos.slice(0, 4).map((c) => `${c.nome} ${c.votos.toLocaleString('pt-BR')}`).join(' · ');
+  console.log(`  1º turno: ${Object.keys(mun[0]).length} municípios; ${resumo(t1)}`);
+  if (t2) console.log(`  2º turno: ${Object.keys(mun[1]).length} municípios; ${resumo(t2)}`);
+  return { t1, t2 };
 }
 
 // ---------------------------------------------------------------- malhas do IBGE
@@ -138,8 +143,10 @@ async function main() {
   await mkdir(DIR_GEO, { recursive: true });
 
   await salvar(join(DIR_BASE, 'municipios.json'), await prepararMunicipios());
-  for (const ano of [...new Set([2022, ...ANOS_BASE_AO_VIVO, ...ANOS_BASE_SIMULACAO])].sort()) {
-    await salvar(join(DIR_BASE, `presidente-${ano}.json`), await prepararPresidente(ano));
+  for (const ano of ANOS_HISTORICO) {
+    const { t1, t2 } = await prepararPresidente(ano);
+    await salvar(join(DIR_BASE, `presidente-${ano}.json`), t1);
+    if (t2) await salvar(join(DIR_BASE, `presidente-${ano}-2t.json`), t2);
   }
   await prepararGeo();
   console.log(`\nBase histórica pronta em ${((Date.now() - t0) / 1000).toFixed(0)} s.`);

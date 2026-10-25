@@ -5,8 +5,8 @@ import { extname, join, normalize } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { spawnSync } from 'node:child_process';
 import {
-  ANOS_BASE_AO_VIVO, ANOS_BASE_SIMULACAO, CICLO, CONCORRENCIA_ESTADUAL, DIR_BASE, DIR_CACHE, DIR_DIST, DIR_GEO,
-  INTERVALO_COLETA_MS, INTERVALO_ESTADUAL_MS, NOMES_UF, PORTA, SIMULACOES_ESTADUAIS, THREADS, URL_TSE,
+  BASES_AO_VIVO, CICLO, DIR_BASE, DIR_CACHE, DIR_DIST, DIR_GEO, HIPER_POR_TURNO, INTERVALO_COLETA_MS, PORTA,
+  SIMULACAO, THREADS, TURNO_SIMULACAO, URL_TSE, MODO_PUBLICO, CORS_ORIGEM,
 } from './config.ts';
 import { ClienteTse } from './tse/cliente.ts';
 import { ColetorAoVivo, descobrirEleicao } from './tse/coletor.ts';
@@ -15,21 +15,35 @@ import { Simulador } from './simulacao/simulador.ts';
 import { ExecutorModelo } from './modelo/executor.ts';
 import { montarCovariaveis } from './modelo/variaveis.ts';
 import { Corrida } from './corrida.ts';
-import { resumirPartidos } from './partidos.ts';
 import { gerarInsights } from './insights.ts';
 import type { BasePresidente, MunicipioBase, StatusServidor } from '../shared/tipos.ts';
 
 // ------------------------------------------------------------ base histórica
-const anos = [...new Set([2022, ...ANOS_BASE_AO_VIVO, ...ANOS_BASE_SIMULACAO])];
-const arquivosBase = ['municipios.json', ...anos.map((a) => `presidente-${a}.json`)];
-if (arquivosBase.some((a) => !existsSync(join(DIR_BASE, a))) || !existsSync(join(DIR_GEO, 'ufs.json'))) {
+const arquivosBase = [...new Set(['municipios', ...Object.values(BASES_AO_VIVO).flat(),
+  ...Object.values(SIMULACAO).flatMap((x) => [x.verdade, ...x.bases])])];
+if (arquivosBase.some((a) => !existsSync(join(DIR_BASE, `${a}.json`))) || !existsSync(join(DIR_GEO, 'ufs.json'))) {
   console.log('Base histórica não encontrada — preparando agora (uma única vez)…\n');
   const r = spawnSync(process.execPath, [join(import.meta.dirname, 'dados', 'preparar.ts')], { stdio: 'inherit' });
   if (r.status !== 0) process.exit(1);
 }
-const ler = <T>(arq: string): T => JSON.parse(readFileSync(join(DIR_BASE, arq), 'utf8')) as T;
-const municipios = ler<Record<string, MunicipioBase>>('municipios.json');
-const bases = Object.fromEntries(anos.map((a) => [a, ler<BasePresidente>(`presidente-${a}.json`)])) as Record<number, BasePresidente>;
+const ler = <T>(arq: string): T => JSON.parse(readFileSync(join(DIR_BASE, `${arq}.json`), 'utf8')) as T;
+const municipios = ler<Record<string, MunicipioBase>>('municipios');
+const cacheBases = new Map<string, BasePresidente>();
+const base = (nome: string) => {
+  if (!cacheBases.has(nome)) cacheBases.set(nome, ler<BasePresidente>(nome));
+  return cacheBases.get(nome)!;
+};
+
+/** Variáveis históricas de uma corrida: no 2º turno, a base principal é o 1º turno da mesma eleição. */
+function covariaveisPara(turno: number, nomesBases: string[]) {
+  const bases = nomesBases.map(base);
+  return montarCovariaveis(Object.keys(municipios), municipios, bases, {
+    // no 2º turno entram todos os candidatos relevantes do 1º turno (para estimar as transferências)
+    quantosPrincipal: turno === 2 ? 6 : 4,
+    // a "fração no 2º turno" da base principal seria o próprio resultado a prever
+    ignorarSegPrincipal: turno === 2,
+  });
+}
 
 // ------------------------------------------------------------ eventos (SSE)
 const clientes = new Set<ServerResponse>();
@@ -40,7 +54,7 @@ function notificar(c: Corrida) {
     pendentesEnvio.delete(c.info.id);
     const msg = `data: ${JSON.stringify({ id: c.info.id, versao: c.versao })}\n\n`;
     for (const r of clientes) r.write(msg);
-  }, 300));
+  }, 250));
 }
 setInterval(() => { for (const r of clientes) r.write(': ping\n\n'); }, 20_000);
 
@@ -48,15 +62,13 @@ setInterval(() => { for (const r of clientes) r.write(': ping\n\n'); }, 20_000);
 // executores separados: a simulação nunca atrasa as projeções ao vivo
 const executor = new ExecutorModelo(THREADS);
 const executorSimulacao = new ExecutorModelo(Math.min(2, THREADS));
-const executorEstadual = new ExecutorModelo(Math.min(2, THREADS));
 const projetar = (c: Corrida) => void c.projetar(
-  c.info.modo === 'simulacao' ? executorSimulacao : c.info.cargo === 1 ? executor : executorEstadual,
+  c.info.modo === 'simulacao' ? executorSimulacao : executor,
   () => { verificarMarco(c); notificar(c); },
 );
 
-/** A cada 5% de seções totalizadas (Presidente), gera e guarda uma análise de insights. */
+/** A cada 5% de seções totalizadas, gera e guarda uma análise de insights. */
 function verificarMarco(c: Corrida) {
-  if (c.info.cargo !== 1) return;
   const pst = c.totais.percentualSecoes;
   if (pst + 1e-9 < c.proximoMarco) return;
   const marco = Math.min(1, Math.round(Math.floor((pst + 1e-9) / 0.05) * 5) / 100);
@@ -70,15 +82,19 @@ function verificarMarco(c: Corrida) {
 }
 
 const cliente = new ClienteTse();
-let aoVivo: { corrida: Corrida; coletor: ColetorAoVivo; pleito: string; eleicaoEstadual: number | null } | null = null;
+let aoVivo: { corrida: Corrida; coletor: ColetorAoVivo; pleito: string } | null = null;
 let erroInicio: string | null = null;
 (async () => {
   for (let tentativa = 0; !aoVivo; tentativa++) {
     try {
-      const { info, pleito, eleicaoEstadual } = await descobrirEleicao(cliente);
-      const codigos = Object.keys(municipios);
-      const cov = montarCovariaveis(codigos, municipios, ANOS_BASE_AO_VIVO.map((a) => bases[a]));
-      const corrida = new Corrida({ ...info, anoAnterior: ANOS_BASE_AO_VIVO[0] }, municipios, cov, bases[ANOS_BASE_AO_VIVO[0]]);
+      const { info, pleito } = await descobrirEleicao(cliente);
+      const nomesBases = BASES_AO_VIVO[info.turno] ?? BASES_AO_VIVO[1];
+      const anterior = base(nomesBases[0]);
+      const corrida = new Corrida(
+        { ...info, anoAnterior: anterior.ano, rotuloAnterior: info.turno === 2 ? '1º turno' : String(anterior.ano) },
+        municipios, covariaveisPara(info.turno, nomesBases), anterior,
+      );
+      corrida.hiper = HIPER_POR_TURNO[info.turno];
       const arquivo = join(DIR_CACHE, `ao-vivo-${info.eleicao}.json`);
       if (existsSync(arquivo)) {
         try {
@@ -96,12 +112,11 @@ let erroInicio: string | null = null;
           .then(() => writeFile(`${arquivo}.tmp`, JSON.stringify(corrida.paraDisco())))
           .then(() => rename(`${arquivo}.tmp`, arquivo))
           .catch((e) => console.error('Falha ao salvar estado:', e.message));
-      }, 20_000);
+      }, 15_000);
       const coletor = new ColetorAoVivo(cliente, corrida, () => notificar(corrida), () => projetar(corrida));
-      aoVivo = { corrida, coletor, pleito, eleicaoEstadual };
+      aoVivo = { corrida, coletor, pleito };
       coletor.iniciar();
-      iniciarEstaduais();
-      console.log(`Ao vivo: ${info.titulo} (${pleito})`);
+      console.log(`Ao vivo: ${info.titulo} (${pleito}) · bases: ${nomesBases.join(', ')}`);
     } catch (e) {
       erroInicio = `Não foi possível ler a configuração do TSE: ${(e as Error).message}`;
       console.error(erroInicio);
@@ -110,56 +125,26 @@ let erroInicio: string | null = null;
   }
 })();
 
+const cfgSim = SIMULACAO[TURNO_SIMULACAO];
 const simulador = new Simulador(
   municipios,
-  bases[2022],
-  ANOS_BASE_SIMULACAO.map((a) => bases[a]),
+  base(cfgSim.verdade),
+  cfgSim.bases.map(base),
   (c) => { notificar(c); projetar(c); },
+  undefined,
+  { turno: TURNO_SIMULACAO, covariaveis: covariaveisPara(TURNO_SIMULACAO, cfgSim.bases) },
 );
-
-// Governador e Senador das 27 UFs: coletados o tempo todo (resumo por partido), com cliente,
-// intervalo e threads próprios para nunca atrasar a disputa presidencial
-const estaduais = new Map<string, Corrida>();
-const clienteEstadual = new ClienteTse(CONCORRENCIA_ESTADUAL);
-
-function iniciarEstaduais() {
-  let i = 0;
-  for (const uf of Object.keys(NOMES_UF)) {
-    if (uf === 'zz') continue;
-    for (const cargo of ['governador', 'senador']) obterEstadual(`${cargo}-${uf}`, 400 * i++);
-  }
-}
-
-function obterEstadual(id: string, atrasoMs = 0): Corrida | null {
-  const m = /^(governador|senador)-([a-z]{2})$/.exec(id);
-  const eleicao = aoVivo?.eleicaoEstadual;
-  if (!m || !eleicao || !NOMES_UF[m[2]] || m[2] === 'zz') return null;
-  const existente = estaduais.get(id);
-  if (existente) return existente;
-  const [, nome, uf] = m;
-  const cargo = nome === 'governador' ? 3 : 5;
-  const munUf = Object.fromEntries(Object.entries(municipios).filter(([, mun]) => mun.uf === uf));
-  const cov = montarCovariaveis(Object.keys(munUf), munUf, ANOS_BASE_AO_VIVO.map((a) => bases[a]));
-  const nomeCargo = cargo === 3 ? 'Governador' : 'Senador';
-  const c = new Corrida({
-    id, modo: 'ao-vivo', eleicao, turno: 1, cargo, nomeCargo, abrangencia: uf,
-    // 2026: renovação de 2/3 do Senado → 2 vagas por UF (atualizado pelo arquivo do TSE)
-    vagas: cargo === 5 ? 2 : 1,
-    maioriaAbsoluta: cargo === 3,
-    titulo: `${nomeCargo} · ${NOMES_UF[uf]}`,
-    anoAnterior: ANOS_BASE_AO_VIVO[0],
-  }, munUf, cov, bases[ANOS_BASE_AO_VIVO[0]]);
-  c.simulacoes = SIMULACOES_ESTADUAIS;
-  const coletor = new ColetorAoVivo(clienteEstadual, c, () => notificar(c), () => projetar(c), () => true, INTERVALO_ESTADUAL_MS);
-  estaduais.set(id, c);
-  coletor.iniciar(atrasoMs);
-  return c;
+simulador.corrida.hiper = HIPER_POR_TURNO[TURNO_SIMULACAO];
+if (MODO_PUBLICO) {
+  // em produção a simulação é uma demonstração fixa: roda uma vez (~1 min) e para no resultado final
+  simulador.velocidade = 2;
+  simulador.iniciar();
 }
 
 function corrida(id: string): Corrida | null {
   if (id === 'simulacao' || id === simulador.corrida.info.id) return simulador.corrida;
   if (aoVivo && (id === 'ao-vivo' || id === aoVivo.corrida.info.id)) return aoVivo.corrida;
-  return obterEstadual(id);
+  return null;
 }
 
 function status(): StatusServidor {
@@ -169,13 +154,13 @@ function status(): StatusServidor {
       disponivel: !!aoVivo,
       pleito: aoVivo?.pleito ?? '',
       corrida: aoVivo?.corrida.info ?? null,
-      eleicaoEstadual: aoVivo?.eleicaoEstadual ?? null,
       intervaloColetaMs: INTERVALO_COLETA_MS,
       ultimaColeta: aoVivo?.coletor.ultimaColeta ?? null,
       erro: aoVivo?.coletor.erro ?? erroInicio,
-      requisicoes: cliente.requisicoes + clienteEstadual.requisicoes,
+      requisicoes: cliente.requisicoes,
     },
     simulacao: {
+      controlavel: !MODO_PUBLICO,
       ativa: simulador.ativa,
       relogio: simulador.relogio(),
       velocidade: simulador.velocidade,
@@ -186,6 +171,40 @@ function status(): StatusServidor {
 }
 
 // ------------------------------------------------------------ HTTP
+/**
+ * Respostas grandes (estado e mapa por município) são serializadas e comprimidas uma vez por
+ * versão da disputa, e não a cada visitante.
+ */
+const cacheRespostas = new Map<string, { chave: string; corpo: Buffer; gz: Buffer | null }>();
+function enviarJsonCache(req: IncomingMessage, res: ServerResponse, id: string, chave: string, gerar: () => unknown) {
+  let c = cacheRespostas.get(id);
+  if (!c || c.chave !== chave) {
+    const corpo = Buffer.from(JSON.stringify(gerar()));
+    c = { chave, corpo, gz: corpo.length > 2048 ? gzipSync(corpo) : null };
+    cacheRespostas.set(id, c);
+  }
+  const gzip = c.gz && /\bgzip\b/.test(String(req.headers['accept-encoding'] ?? ''));
+  res.writeHead(200, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store',
+    ...(gzip ? { 'Content-Encoding': 'gzip' } : {}),
+  });
+  res.end(gzip ? c.gz : c.corpo);
+}
+
+const origensCors = CORS_ORIGEM.split(',').map((o) => o.trim().replace(/\/+$/, '')).filter(Boolean);
+function aplicarCors(req: IncomingMessage, res: ServerResponse) {
+  const origem = req.headers.origin;
+  if (origensCors.includes('*')) res.setHeader('Access-Control-Allow-Origin', '*');
+  else if (origem && origensCors.includes(origem)) {
+    res.setHeader('Access-Control-Allow-Origin', origem);
+    res.setHeader('Vary', 'Origin');
+  }
+}
+
+/** "Recalcular agora" é caro: no máximo uma análise nova a cada 20 s por disputa. */
+const ultimoRecalculo = new Map<string, number>();
+
 function enviarJson(req: IncomingMessage, res: ServerResponse, dados: unknown, codigo = 200) {
   const corpo = Buffer.from(JSON.stringify(dados));
   const gzip = /\bgzip\b/.test(String(req.headers['accept-encoding'] ?? '')) && corpo.length > 2048;
@@ -247,25 +266,31 @@ const servidor = createServer(async (req, res) => {
     const partes = url.pathname.split('/').filter(Boolean);
 
     if (partes[0] === 'api') {
+      aplicarCors(req, res);
+      if (req.method === 'OPTIONS') {
+        res.writeHead(204, { 'Access-Control-Allow-Methods': 'GET, POST', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Max-Age': '86400' });
+        res.end();
+        return;
+      }
       const [, recurso, a, b, c] = partes;
       if (recurso === 'status') return enviarJson(req, res, status());
       if (recurso === 'insights' && a) {
         const cr = corrida(a);
         if (!cr) return enviarJson(req, res, { erro: 'Disputa não encontrada' }, 404);
         if (b === 'recalcular' && req.method === 'POST') {
-          const analise = gerarInsights(cr, null, cr.insights.at(-1));
+          const ultima = cr.insights.at(-1);
+          if (ultima && Date.now() - (ultimoRecalculo.get(cr.info.id) ?? 0) < 20_000) return enviarJson(req, res, ultima);
+          ultimoRecalculo.set(cr.info.id, Date.now());
+          const analise = gerarInsights(cr, null, ultima);
           cr.insights.push(analise);
           if (cr.insights.length > 40) cr.insights.shift();
           return enviarJson(req, res, analise);
         }
         return enviarJson(req, res, { analises: cr.insights });
       }
-      if (recurso === 'partidos') {
-        const todas = [...estaduais.values()];
-        return enviarJson(req, res, resumirPartidos(todas.filter((x) => x.info.cargo === 3), todas.filter((x) => x.info.cargo === 5)));
-      }
       if (recurso === 'eventos') {
-        res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
+        // X-Accel-Buffering: proxies (nginx/Traefik) não devem segurar os eventos
+        res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
         res.write('retry: 3000\n\n');
         clientes.add(res);
         req.on('close', () => clientes.delete(res));
@@ -274,10 +299,13 @@ const servidor = createServer(async (req, res) => {
       if (recurso === 'corrida' && a) {
         const cr = corrida(a);
         if (!cr) return enviarJson(req, res, { erro: 'Disputa não encontrada' }, 404);
-        if (b === 'unidades') return enviarJson(req, res, cr.resumoUnidades());
-        return enviarJson(req, res, cr.estado());
+        if (b === 'unidades') return enviarJsonCache(req, res, `${cr.info.id}:unidades`, String(cr.versao), () => cr.resumoUnidades());
+        cr.ultimoAcesso = Date.now();
+        const chave = `${cr.versao}|${cr.ultimaColeta}|${cr.erroColeta}|${cr.historico.length}|${cr.projecao?.disponivel}`;
+        return enviarJsonCache(req, res, `${cr.info.id}:estado`, chave, () => cr.estado());
       }
       if (recurso === 'simulacao' && req.method === 'POST') {
+        if (MODO_PUBLICO) return enviarJson(req, res, { erro: 'Simulação somente leitura neste servidor' }, 403);
         if (a === 'iniciar') simulador.iniciar();
         else if (a === 'pausar') simulador.pausar();
         else if (a === 'reiniciar') simulador.reiniciar();

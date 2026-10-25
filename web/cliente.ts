@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import type { AnaliseInsights, EstadoCorrida, ResumoPartidos, StatusServidor, UnidadeResumo } from '../shared/tipos.ts';
+import type { AnaliseInsights, EstadoCorrida, StatusServidor, UnidadeResumo } from '../shared/tipos.ts';
+
+/** Vazio quando a interface é servida pelo próprio servidor; na Vercel, o domínio da API (VITE_API_URL). */
+export const BASE_API = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
-  const r = await fetch(url, init);
+  const r = await fetch(BASE_API + url, init);
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return (await r.json()) as T;
 }
@@ -11,7 +14,6 @@ export const api = {
   status: () => json<StatusServidor>('/api/status'),
   corrida: (id: string) => json<EstadoCorrida>(`/api/corrida/${id}`),
   unidades: (id: string) => json<UnidadeResumo[]>(`/api/corrida/${id}/unidades`),
-  partidos: () => json<ResumoPartidos>('/api/partidos'),
   insights: (id: string) => json<{ analises: AnaliseInsights[] }>(`/api/insights/${id}`),
   recalcularInsights: (id: string) => json<AnaliseInsights>(`/api/insights/${id}/recalcular`, { method: 'POST' }),
   simulacao: (acao: string, params = '') => json<StatusServidor['simulacao']>(`/api/simulacao/${acao}${params}`, { method: 'POST' }),
@@ -25,7 +27,7 @@ const ouvintesConexao = new Set<(ok: boolean) => void>();
 
 function garantirFonte() {
   if (fonte) return;
-  fonte = new EventSource('/api/eventos');
+  fonte = new EventSource(`${BASE_API}/api/eventos`);
   fonte.onopen = () => { conectado = true; ouvintesConexao.forEach((f) => f(true)); };
   fonte.onerror = () => { conectado = false; ouvintesConexao.forEach((f) => f(false)); };
   fonte.onmessage = (m) => {

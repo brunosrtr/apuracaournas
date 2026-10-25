@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { availableParallelism } from 'node:os';
+import type { Hiper } from './modelo/projecao.ts';
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -15,21 +16,57 @@ export const URL_TSE = process.env.URL_TSE ?? 'https://resultados.tse.jus.br/ofi
 export const CICLO = process.env.CICLO ?? 'ele2026';
 
 /** Intervalo entre ciclos de coleta no TSE (ms). Seja gentil com o servidor. */
-export const INTERVALO_COLETA_MS = Number(process.env.INTERVALO_COLETA_MS ?? 20_000);
+export const INTERVALO_COLETA_MS = Number(process.env.INTERVALO_COLETA_MS ?? 10_000);
 /** Requisições simultâneas ao TSE. */
 export const CONCORRENCIA = Number(process.env.CONCORRENCIA ?? 8);
 /** Cenários de Monte Carlo por projeção (divididos entre as threads). */
 export const SIMULACOES = Number(process.env.SIMULACOES ?? 4000);
-/** Governador e Senado das 27 UFs: consulta mais espaçada, conexões e cenários próprios. */
-export const INTERVALO_ESTADUAL_MS = Number(process.env.INTERVALO_ESTADUAL_MS ?? 40_000);
-export const CONCORRENCIA_ESTADUAL = Number(process.env.CONCORRENCIA_ESTADUAL ?? 5);
-export const SIMULACOES_ESTADUAIS = Number(process.env.SIMULACOES_ESTADUAIS ?? 1500);
+/**
+ * Produção (servidor público): ninguém controla a simulação, que é compartilhada por todos os
+ * visitantes; ela roda sozinha uma vez ao subir o servidor e fica parada no resultado final.
+ */
+export const MODO_PUBLICO = process.env.MODO_PUBLICO === '1';
+/** Origens autorizadas a chamar a API de outro domínio (ex.: a interface na Vercel). Lista separada por vírgulas ou "*". */
+export const CORS_ORIGEM = process.env.CORS_ORIGEM ?? '*';
 /** Threads usadas pelo modelo. */
 export const THREADS = Math.max(1, Math.min(Number(process.env.THREADS ?? 4), availableParallelism() - 1));
 
-/** Anos usados como base histórica (o primeiro é o principal). */
-export const ANOS_BASE_AO_VIVO = [2022, 2018];
-export const ANOS_BASE_SIMULACAO = [2018, 2014];
+/** Eleições presidenciais baixadas do Portal de Dados Abertos (1º e, quando houver, 2º turno). */
+export const ANOS_HISTORICO = [2014, 2018, 2022, 2026];
+
+/**
+ * Bases históricas da eleição ao vivo, por turno. A primeira é a principal (e a usada nas comparações).
+ * No 2º turno, a principal é o 1º turno da mesma eleição: mesmos candidatos, três semanas antes.
+ */
+export const BASES_AO_VIVO: Record<number, string[]> = {
+  1: ['presidente-2022', 'presidente-2018'],
+  2: ['presidente-2026', 'presidente-2022-2t'],
+};
+
+/** Simulação (reapresentação de 2022), por turno: resultado real e bases históricas equivalentes. */
+export const SIMULACAO: Record<number, { verdade: string; bases: string[] }> = {
+  1: { verdade: 'presidente-2022', bases: ['presidente-2018', 'presidente-2014'] },
+  2: { verdade: 'presidente-2022-2t', bases: ['presidente-2022', 'presidente-2018'] },
+};
+export const TURNO_SIMULACAO = Number(process.env.TURNO_SIMULACAO ?? 2);
+
+/**
+ * Hiperparâmetros do modelo por turno (calibrados por backtest: npm run testar -- calibrar).
+ * No 2º turno a base é o 1º turno da mesma eleição, e a relação entre os dois é muito estável:
+ * mesmo com as incertezas estruturais em 15% das do 1º turno, a margem de 95% cobriu o resultado
+ * real em 100% dos pontos dos 3 cenários de ordem. Usamos 30% (mais cauteloso).
+ */
+const ESCALA_2T = 0.3;
+export const HIPER_POR_TURNO: Record<number, Partial<Hiper>> = {
+  1: {},
+  2: {
+    sigmaExtrap: 0.015 * ESCALA_2T,
+    sigmaSemDados: 0.025 * ESCALA_2T,
+    sigmaMacro: 0.025 * ESCALA_2T,
+    sigmaUf: 0.03 * ESCALA_2T,
+    sigmaRi: 0.02 * ESCALA_2T,
+  },
+};
 
 export const NOMES_UF: Record<string, string> = {
   ac: 'Acre', al: 'Alagoas', ap: 'Amapá', am: 'Amazonas', ba: 'Bahia', ce: 'Ceará', df: 'Distrito Federal',

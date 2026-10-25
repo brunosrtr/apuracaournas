@@ -34,10 +34,18 @@ const titulo = (s: string) => s.toLowerCase().replace(/(^|\s)\S/g, (l) => l.toUp
 
 interface Coluna { nome: string; valor: (cd: string) => number; ref?: Omit<Referencia, 'indice' | 'dp'> }
 
+export interface OpcoesCovariaveis {
+  /** candidatos da base principal usados como variáveis (padrão 4) */
+  quantosPrincipal?: number;
+  /** ignora a "fração no 2º turno" da base principal (no 2º turno, seria o próprio alvo) */
+  ignorarSegPrincipal?: boolean;
+}
+
 export function montarCovariaveis(
   codigos: string[],
   municipios: Record<string, MunicipioBase>,
   bases: BasePresidente[],
+  opcoes: OpcoesCovariaveis = {},
 ): Covariaveis {
   const [principal, ...secundarias] = bases;
   const colunas: Coluna[] = [];
@@ -47,30 +55,32 @@ export function montarCovariaveis(
   };
   const totalValidos = (b: BasePresidente) => b.candidatos.reduce((a, c) => a + c.votos, 0);
 
-  const adicionarCandidatos = (b: BasePresidente, quantos: number, quadraticos: number) => {
+  const adicionarCandidatos = (b: BasePresidente, quantos: number, quadraticos: number, comSegundo = true) => {
     const total = totalValidos(b);
     b.candidatos.slice(0, quantos).forEach((c) => {
       colunas.push({
-        nome: `${titulo(c.nome)} ${b.ano}`,
+        nome: `${titulo(c.nome)} ${rotulo(b)}`,
         valor: fracao(b, c.numero),
         ref: { numero: c.numero, nome: c.nome, ano: b.ano, fracaoNacional: c.votos / total },
       });
     });
     b.candidatos.slice(0, quadraticos).forEach((c) => {
       const f = fracao(b, c.numero);
-      colunas.push({ nome: `${titulo(c.nome)} ${b.ano} (quadrático)`, valor: (cd) => f(cd) ** 2 });
+      colunas.push({ nome: `${titulo(c.nome)} ${rotulo(b)} (quadrático)`, valor: (cd) => f(cd) ** 2 });
     });
+    if (!comSegundo || !b.vencedor2T) return;
     const venc = b.candidatos.find((c) => c.numero === b.vencedor2T);
     colunas.push({ nome: `2º turno ${b.ano} (${titulo(venc?.nome ?? b.vencedor2T)})`, valor: (cd) => b.municipios[cd]?.seg ?? NaN });
   };
+  const rotulo = (b: BasePresidente) => (b.turno === 2 ? `${b.ano} 2º t.` : String(b.ano));
 
-  adicionarCandidatos(principal, 4, 2);
+  adicionarCandidatos(principal, opcoes.quantosPrincipal ?? 4, 2, !opcoes.ignorarSegPrincipal);
   colunas.push({
-    nome: `Comparecimento ${principal.ano}`,
+    nome: `Comparecimento ${rotulo(principal)}`,
     valor: (cd) => { const h = principal.municipios[cd]; return h && h.aptos > 0 ? h.comp / h.aptos : NaN; },
   });
   colunas.push({
-    nome: `Brancos e nulos ${principal.ano}`,
+    nome: `Brancos e nulos ${rotulo(principal)}`,
     valor: (cd) => { const h = principal.municipios[cd]; return h && h.comp > 0 ? (h.brancos + h.nulos) / h.comp : NaN; },
   });
   for (const b of secundarias) adicionarCandidatos(b, 3, 0);
@@ -118,7 +128,7 @@ export function montarCovariaveis(
 
   return {
     nomes: manter.map((j) => colunas[j].nome),
-    descricao: `Presidente ${bases.map((b) => b.ano).join(' e ')}, por município`,
+    descricao: `Presidente ${bases.map((b) => (b.turno === 2 ? `${b.ano} (2º turno)` : `${b.ano} (1º turno)`)).join(' e ')}, por município`,
     x,
     compBase,
     validoBase,

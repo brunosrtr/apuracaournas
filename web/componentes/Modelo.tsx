@@ -13,6 +13,14 @@ export function Modelo({ estado }: { estado: EstadoCorrida }) {
     <div className="grade">
       <section className="cartao col-12">
         <h2>Por que não basta olhar o parcial</h2>
+        {estado.corrida.turno === 2 && (
+          <p style={{ marginTop: 0, color: 'var(--text-2)', maxWidth: 900 }}>
+            <strong>No 2º turno</strong>, a base principal é o resultado do 1º turno da mesma eleição, município a município, com
+            todos os candidatos. Nos municípios já apurados, o modelo aprende em tempo real como os votos de cada candidato
+            eliminado se dividiram e aplica isso aos municípios que faltam. No backtest do 2º turno de 2022, o erro médio com
+            menos de 30% apurado foi de 0,3 ponto, e o resultado real ficou dentro da margem de 95% em todos os pontos testados.
+          </p>
+        )}
         <p style={{ marginTop: 0, color: 'var(--text-2)', maxWidth: 900 }}>
           A ordem da apuração não é aleatória: algumas regiões e cidades chegam antes de outras. Em 2022, Bolsonaro liderou o
           1º turno até cerca de 70% das urnas apuradas, porque Norte e Nordeste foram totalizados depois. O modelo corrige isso

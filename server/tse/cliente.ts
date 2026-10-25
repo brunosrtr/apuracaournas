@@ -56,7 +56,7 @@ export class ClienteTse {
     const base = modoArquivos.assinado && url.endsWith('.json') ? `${url.slice(0, -5)}.jws` : url;
     // parâmetro que muda a cada 15 s: obriga a CDN a buscar no servidor de origem
     const furar = furarCache || Date.now() < modoArquivos.furarCacheAte;
-    const preferido = furar ? `${base}?_=${Math.floor(Date.now() / 15_000)}` : base;
+    const preferido = furar ? `${base}?_=${Math.floor(Date.now() / 5_000)}` : base;
     const r = await this.buscar<T>(preferido, condicional);
     if (r.tipo === 'ausente' && preferido !== url) return this.buscar<T>(url, condicional);
     if (r.tipo === 'ausente' && url.endsWith('.json')) return this.buscar<T>(`${url.slice(0, -5)}.jws`, condicional);

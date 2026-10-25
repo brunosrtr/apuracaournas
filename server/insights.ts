@@ -81,6 +81,12 @@ export function gerarInsights(c: Corrida, marco: number | null, anterior?: Anali
   if (t.validos <= 0) return base;
 
   const ano = c.anterior.ano;
+  // no 2º turno a comparação é com o 1º turno da mesma eleição (mesmos candidatos)
+  const t2 = c.info.turno === 2;
+  const emAnt = t2 ? 'no 1º turno' : `em ${ano}`;
+  const EmAnt = t2 ? 'No 1º turno' : `Em ${ano}`;
+  const vsAnt = t2 ? '1º turno' : String(ano);
+  const aoAnt = t2 ? 'ao 1º turno' : `a ${ano}`;
   const eq = c.equivalentes();
   const pares = Object.entries(eq);
   const cand = new Map(c.candidatos.map((x) => [x.numero, x]));
@@ -97,8 +103,8 @@ export function gerarInsights(c: Corrida, marco: number | null, anterior?: Anali
     if (!v) continue;
     ins.push({
       id: `nacional-${n}`, categoria: 'nacional', numero: n, tom: tom(v.pp),
-      titulo: `Brasil: ${nome(n)} ${pp(v.pp)} em relação a ${nomeAnt(a)} em ${ano}`,
-      texto: `Nos municípios já apurados, ${nome(n)} (${partido(n)}) tem ${pct(v.atual)} dos válidos; ${nomeAnt(a)} teve ${pct(v.antes)} nesses mesmos municípios em ${ano} (${rel(v.votos)} em votos).`,
+      titulo: t2 ? `Brasil: ${nome(n)} ${pp(v.pp)} em relação ao 1º turno` : `Brasil: ${nome(n)} ${pp(v.pp)} em relação a ${nomeAnt(a)} em ${ano}`,
+      texto: `Nos municípios já apurados, ${nome(n)} (${partido(n)}) tem ${pct(v.atual)} dos válidos; ${nomeAnt(a)} teve ${pct(v.antes)} nesses mesmos municípios ${emAnt} (${rel(v.votos)} em votos).`,
       intensidade: 200 + 300 * Math.abs(v.pp),
     });
   }
@@ -117,8 +123,8 @@ export function gerarInsights(c: Corrida, marco: number | null, anterior?: Anali
   for (const d of deltasRegiao.sort((x, y) => Math.abs(y.v.pp) - Math.abs(x.v.pp)).slice(0, 4)) {
     ins.push({
       id: `regiao-${d.r}-${d.n}`, categoria: 'regiao', numero: d.n, tom: tom(d.v.pp),
-      titulo: `${NOMES_REGIAO[d.r]}: ${partido(d.n) || nome(d.n)} ${pp(d.v.pp)} vs ${ano}`,
-      texto: `${nome(d.n)} tem ${pct(d.v.atual)} no ${NOMES_REGIAO[d.r]} (${pct(d.frac)} do eleitorado apurado), contra ${pct(d.v.antes)} de ${nomeAnt(d.a)} nos mesmos municípios em ${ano} — ${rel(d.v.votos)} em votos.`,
+      titulo: `${NOMES_REGIAO[d.r]}: ${partido(d.n) || nome(d.n)} ${pp(d.v.pp)} vs ${vsAnt}`,
+      texto: `${nome(d.n)} tem ${pct(d.v.atual)} no ${NOMES_REGIAO[d.r]} (${pct(d.frac)} do eleitorado apurado), contra ${pct(d.v.antes)} de ${nomeAnt(d.a)} nos mesmos municípios ${emAnt} — ${rel(d.v.votos)} em votos.`,
       intensidade: 60 + 300 * Math.abs(d.v.pp),
     });
   }
@@ -138,8 +144,8 @@ export function gerarInsights(c: Corrida, marco: number | null, anterior?: Anali
   for (const d of deltasUf.sort((x, y) => Math.abs(y.v.pp) - Math.abs(x.v.pp)).slice(0, 6)) {
     ins.push({
       id: `estado-${d.u}-${d.n}`, categoria: 'estado', numero: d.n, tom: tom(d.v.votos),
-      titulo: `${NOMES_UF[d.u]}: ${partido(d.n) || nome(d.n)} com ${rel(d.v.votos)} de votos em relação a ${ano}`,
-      texto: `Com ${pct(d.frac)} do eleitorado apurado, ${nome(d.n)} tem ${pct(d.v.atual)} dos válidos ${naUf(d.u)}, contra ${pct(d.v.antes)} de ${nomeAnt(d.a)} nos mesmos municípios em ${ano} (${pp(d.v.pp)}).`,
+      titulo: `${NOMES_UF[d.u]}: ${partido(d.n) || nome(d.n)} com ${rel(d.v.votos)} de votos em relação ${aoAnt}`,
+      texto: `Com ${pct(d.frac)} do eleitorado apurado, ${nome(d.n)} tem ${pct(d.v.atual)} dos válidos ${naUf(d.u)}, contra ${pct(d.v.antes)} de ${nomeAnt(d.a)} nos mesmos municípios ${emAnt} (${pp(d.v.pp)}).`,
       intensidade: 50 + 250 * Math.abs(d.v.pp),
     });
   }
@@ -164,7 +170,7 @@ export function gerarInsights(c: Corrida, marco: number | null, anterior?: Anali
       ins.push({
         id: `virada-${u}`, categoria: 'virada', numero: lider.numero, tom: 'neutro',
         titulo: `Virada ${naUf(u)}: ${nome(lider.numero)} à frente`,
-        texto: `Em ${ano}, ${nomeAnt(vencAnt)} venceu ${naUf(u)}. Agora a projeção põe ${nome(lider.numero)} (${partido(lider.numero)}) em 1º, com ${pct(lider.media)}${margem((lider.p975 - lider.p025) / 2)} e chance de ${prob(lider.probPrimeiro)}.`,
+        texto: `${EmAnt}, ${nomeAnt(vencAnt)} venceu ${naUf(u)}. Agora a projeção põe ${nome(lider.numero)} (${partido(lider.numero)}) em 1º, com ${pct(lider.media)}${margem((lider.p975 - lider.p025) / 2)} e chance de ${prob(lider.probPrimeiro)}.`,
         intensidade: 150 + 30 * lider.probPrimeiro,
       });
     }
@@ -177,8 +183,8 @@ export function gerarInsights(c: Corrida, marco: number | null, anterior?: Anali
     if (Math.abs(d) >= 0.003) {
       ins.push({
         id: 'comparecimento-br', categoria: 'comparecimento', tom: tom(d),
-        titulo: `Comparecimento ${d > 0 ? 'maior' : 'menor'} que em ${ano}: ${pp(d)}`,
-        texto: `Nos municípios já apurados, compareceram ${pct(atual)} dos eleitores, contra ${pct(antes)} nos mesmos municípios em ${ano}. Abstenção ${d > 0 ? 'menor' : 'maior'} pesa mais para quem é forte onde ela muda.`,
+        titulo: `Comparecimento ${d > 0 ? 'maior' : 'menor'} que ${emAnt}: ${pp(d)}`,
+        texto: `Nos municípios já apurados, compareceram ${pct(atual)} dos eleitores, contra ${pct(antes)} nos mesmos municípios ${emAnt}. Abstenção ${d > 0 ? 'menor' : 'maior'} pesa mais para quem é forte onde ela muda.`,
         intensidade: 45 + 400 * Math.abs(d),
       });
     }
@@ -191,7 +197,7 @@ export function gerarInsights(c: Corrida, marco: number | null, anterior?: Anali
     for (const x of variacoesUf) {
       ins.push({
         id: `comparecimento-${x.u}`, categoria: 'comparecimento', tom: tom(x.d),
-        titulo: `${NOMES_UF[x.u]}: comparecimento ${pp(x.d)} vs ${ano}`,
+        titulo: `${NOMES_UF[x.u]}: comparecimento ${pp(x.d)} vs ${vsAnt}`,
         texto: `É uma das maiores variações de comparecimento entre os estados, nos municípios já apurados.`,
         intensidade: 35 + 300 * Math.abs(x.d),
       });
@@ -201,8 +207,8 @@ export function gerarInsights(c: Corrida, marco: number | null, anterior?: Anali
       if (Math.abs(bn - bnAnt) >= 0.004) {
         ins.push({
           id: 'brancos-nulos', categoria: 'comparecimento', tom: tom(bn - bnAnt),
-          titulo: `Brancos e nulos: ${pct(bn)} (${pp(bn - bnAnt)} vs ${ano})`,
-          texto: `Em ${ano}, brancos e nulos somaram ${pct(bnAnt)} nos mesmos municípios.`,
+          titulo: `Brancos e nulos: ${pct(bn)} (${pp(bn - bnAnt)} vs ${vsAnt})`,
+          texto: `${EmAnt}, brancos e nulos somaram ${pct(bnAnt)} nos mesmos municípios.`,
           intensidade: 30 + 300 * Math.abs(bn - bnAnt),
         });
       }
@@ -224,8 +230,8 @@ export function gerarInsights(c: Corrida, marco: number | null, anterior?: Anali
     const m = c.municipios[x.cd];
     ins.push({
       id: `municipio-${x.cd}-${x.n}`, categoria: 'municipio', numero: x.n, tom: tom(x.v.pp),
-      titulo: `${titulo(m.nome)} (${m.uf.toUpperCase()}): ${partido(x.n) || nome(x.n)} ${pp(x.v.pp)} vs ${ano}`,
-      texto: `${nome(x.n)} tem ${pct(x.v.atual)}; ${nomeAnt(x.a)} teve ${pct(x.v.antes)} em ${ano} (${rel(x.v.votos)} em votos).`,
+      titulo: `${titulo(m.nome)} (${m.uf.toUpperCase()}): ${partido(x.n) || nome(x.n)} ${pp(x.v.pp)} vs ${vsAnt}`,
+      texto: `${nome(x.n)} tem ${pct(x.v.atual)}; ${t2 ? 'no 1º turno eram' : `${nomeAnt(x.a)} teve`} ${pct(x.v.antes)} ${t2 ? '' : `em ${ano} `}(${rel(x.v.votos)} em votos).`,
       intensidade: 25 + 150 * Math.abs(x.v.pp),
     });
   }
@@ -245,7 +251,7 @@ export function gerarInsights(c: Corrida, marco: number | null, anterior?: Anali
     ins.push({
       id: `novo-${cd.numero}`, categoria: 'novos', numero: cd.numero, tom: 'neutro',
       titulo: `${titulo(cd.nome)} (${cd.partido}): ${pct(fr)} no país, ${pct(melhor.fr)} em ${NOMES_UF[melhor.u]}`,
-      texto: `Até agora, o melhor desempenho de ${titulo(cd.nome)} é ${naUf(melhor.u)}. Não há candidato equivalente em ${ano} para comparar.`,
+      texto: `Até agora, o melhor desempenho de ${titulo(cd.nome)} é ${naUf(melhor.u)}. Não há candidato equivalente ${emAnt} para comparar.`,
       intensidade: 30 + 200 * fr,
     });
   }

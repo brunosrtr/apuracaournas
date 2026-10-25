@@ -57,7 +57,7 @@ export function Validacao({ estado }: { estado: EstadoCorrida }) {
           <div className="metrica"><span>Cobertura da margem de 95%</span><strong className="num">{fmtPct(cobertura95, 0)}</strong></div>
           <div className="metrica"><span>Erro &lt; 0,5 p.p. a partir de</span><strong className="num">{marco ? `${fmtPct(marco.pst, 1)} apurado` : '—'}</strong></div>
         </div>
-        <div className="muted" style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 650, margin: '18px 0 8px' }}>Resultado real (1º turno 2022)</div>
+        <div className="muted" style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 650, margin: '18px 0 8px' }}>Resultado real ({estado.corrida.turno}º turno 2022)</div>
         {finais.map(([n, f]) => (
           <div key={n} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
             <span className="tag"><i style={{ background: cand.get(n)?.cor }} />{titulo(cand.get(n)?.nome ?? n)}</span>

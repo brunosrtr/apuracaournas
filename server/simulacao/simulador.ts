@@ -1,14 +1,14 @@
-// Simulação da noite de apuração do 1º turno presidencial de 2022.
-// O resultado real de 2022 (por município) é a "verdade"; o modelo só enxerga
-// a apuração parcial simulada e usa 2018 como base histórica — exatamente como
-// fará em 2026 com a base de 2022. Serve para demonstrar e validar o modelo.
+// Simulação da noite de apuração presidencial de 2022 (1º ou 2º turno).
+// O resultado real de 2022 (por município) é a "verdade"; o modelo só enxerga a
+// apuração parcial simulada e as bases históricas equivalentes às que usa ao vivo
+// (no 2º turno: o 1º turno da mesma eleição). Serve para demonstrar e validar o modelo.
 //
 // A ordem de apuração imita o padrão real: Sul/Sudeste/Centro-Oeste chegam antes,
 // Norte/Nordeste e exterior depois, cidades grandes demoram mais e as primeiras
 // seções de cada município não são uma amostra perfeitamente representativa.
 import { Corrida } from '../corrida.ts';
 import { Aleatorio } from '../modelo/algebra.ts';
-import { montarCovariaveis } from '../modelo/variaveis.ts';
+import { montarCovariaveis, type Covariaveis } from '../modelo/variaveis.ts';
 import { atribuirCores } from '../../shared/cores.ts';
 import { REGIAO_POR_UF } from '../config.ts';
 import type { BasePresidente, Candidato, Contagem, CorridaInfo, MunicipioBase, RegistroHistorico } from '../../shared/tipos.ts';
@@ -26,19 +26,22 @@ interface Plano {
   vies: Float64Array;
 }
 
-export const INFO_SIMULACAO: CorridaInfo = {
-  id: 'sim-presidente-2022',
-  modo: 'simulacao',
-  eleicao: 544,
-  turno: 1,
-  cargo: 1,
-  nomeCargo: 'Presidente',
-  abrangencia: 'br',
-  vagas: 1,
-  maioriaAbsoluta: true,
-  titulo: 'Presidente · 1º turno 2022 (simulação)',
-  anoAnterior: 2018,
-};
+export function infoSimulacao(turno: number, anoAnterior: number): CorridaInfo {
+  return {
+    id: `sim-presidente-2022-${turno}t`,
+    modo: 'simulacao',
+    eleicao: turno === 2 ? 545 : 544,
+    turno,
+    cargo: 1,
+    nomeCargo: 'Presidente',
+    abrangencia: 'br',
+    vagas: 1,
+    maioriaAbsoluta: turno === 1,
+    titulo: `Presidente · ${turno}º turno 2022 (simulação)`,
+    anoAnterior,
+    rotuloAnterior: turno === 2 ? '1º turno' : String(anoAnterior),
+  };
+}
 
 export class Simulador {
   corrida: Corrida;
@@ -46,6 +49,7 @@ export class Simulador {
   /** minutos simulados por segundo real */
   velocidade = 1.5;
   minuto = 0;
+  readonly turno: number;
   private planos: Plano[] = [];
   private numeros: string[];
   private fim = 0;
@@ -63,13 +67,15 @@ export class Simulador {
     bases: BasePresidente[],
     aoMudar: (c: Corrida) => void,
     atrasos: Record<string, number> = ATRASO_REGIAO,
+    opcoes: { turno?: number; covariaveis?: Covariaveis } = {},
   ) {
     this.aoMudar = aoMudar;
+    this.turno = opcoes.turno ?? verdade.turno ?? 1;
     const codigos = Object.keys(verdade.municipios).filter((cd) => municipios[cd]);
     const munSim: Record<string, MunicipioBase> = {};
     for (const cd of codigos) munSim[cd] = municipios[cd];
-    const cov = montarCovariaveis(codigos, munSim, bases);
-    this.corrida = new Corrida({ ...INFO_SIMULACAO, anoAnterior: bases[0].ano }, munSim, cov, bases[0]);
+    const cov = opcoes.covariaveis ?? montarCovariaveis(codigos, munSim, bases);
+    this.corrida = new Corrida(infoSimulacao(this.turno, bases[0].ano), munSim, cov, bases[0]);
 
     this.numeros = verdade.candidatos.map((c) => c.numero);
     const cores = atribuirCores(this.numeros);
@@ -108,7 +114,7 @@ export class Simulador {
     const total = 17 * 60 + Math.floor(this.minuto);
     const hh = String(Math.floor(total / 60)).padStart(2, '0');
     const mm = String(total % 60).padStart(2, '0');
-    return `02/10/2022 ${hh}:${mm}`;
+    return `${this.turno === 2 ? '30' : '02'}/10/2022 ${hh}:${mm}`;
   }
 
   iniciar() {
@@ -135,20 +141,27 @@ export class Simulador {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
     this.minuto = 0;
-    this.corrida.historico = [];
-    this.corrida.projecao = null;
-    this.corrida.porUnidade = {};
-    this.corrida.validacao = { final: this.corrida.verdade ?? {}, pontos: [] };
-    this.corrida.insights = [];
-    this.corrida.proximoMarco = 0.05;
+    this.limparDerivados();
     this.atualizar();
     if (rodando) this.iniciar();
   }
 
   /** Posiciona a simulação em um instante (minutos após as 17h). */
   irPara(minuto: number) {
-    this.minuto = Math.max(0, Math.min(this.fim, minuto));
+    const alvo = Math.max(0, Math.min(this.fim, minuto));
+    // voltar no tempo invalida histórico, insights e validação calculados "no futuro"
+    if (alvo < this.minuto) this.limparDerivados();
+    this.minuto = alvo;
     this.atualizar();
+  }
+
+  private limparDerivados() {
+    this.corrida.historico = [];
+    this.corrida.projecao = null;
+    this.corrida.porUnidade = {};
+    this.corrida.validacao = { final: this.corrida.verdade ?? {}, pontos: [] };
+    this.corrida.insights = [];
+    this.corrida.proximoMarco = 0.05;
   }
 
   get duracaoTotal() { return this.fim; }

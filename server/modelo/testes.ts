@@ -7,15 +7,28 @@
 //      npm run testar -- crescimento  A/B: com × sem a variável de crescimento do eleitorado
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { ANOS_BASE_SIMULACAO, DIR_BASE, REGIAO_POR_UF } from '../config.ts';
+import { DIR_BASE, HIPER_POR_TURNO, REGIAO_POR_UF, SIMULACAO } from '../config.ts';
 import { Simulador } from '../simulacao/simulador.ts';
 import { HIPER_PADRAO, projetar, type Hiper } from './projecao.ts';
+import { montarCovariaveis } from './variaveis.ts';
 import type { BasePresidente, MunicipioBase } from '../../shared/tipos.ts';
 
-const ler = <T>(arq: string): T => JSON.parse(readFileSync(join(DIR_BASE, arq), 'utf8')) as T;
-const municipios = ler<Record<string, MunicipioBase>>('municipios.json');
-const p2022 = ler<BasePresidente>('presidente-2022.json');
-const bases = ANOS_BASE_SIMULACAO.map((a) => ler<BasePresidente>(`presidente-${a}.json`));
+const ler = <T>(arq: string): T => JSON.parse(readFileSync(join(DIR_BASE, `${arq}.json`), 'utf8')) as T;
+const municipios = ler<Record<string, MunicipioBase>>('municipios');
+// turno do backtest: "npm run testar -- 1t" para o 1º turno; padrão: 2º turno
+const TURNO = process.argv.includes('1t') ? 1 : 2;
+const cfg = SIMULACAO[TURNO];
+const p2022 = ler<BasePresidente>(cfg.verdade);
+const bases = cfg.bases.map((b) => ler<BasePresidente>(b));
+const covariaveis = montarCovariaveis(Object.keys(municipios), municipios, bases, {
+  quantosPrincipal: TURNO === 2 ? 6 : 4,
+  ignorarSegPrincipal: TURNO === 2,
+});
+const novoSim = (atrasos?: Record<string, number>) => {
+  const sim = new Simulador(municipios, p2022, bases, () => {}, atrasos, { turno: TURNO, covariaveis });
+  sim.corrida.hiper = HIPER_POR_TURNO[TURNO];
+  return sim;
+};
 const nomes = Object.fromEntries(p2022.candidatos.map((c) => [c.numero, c.nome]));
 const pp = (v: number) => (100 * v).toFixed(2).padStart(6);
 
@@ -59,7 +72,7 @@ function avaliar(sim: Simulador, minutos: number[], opcoes: { crescimento: boole
     }
     const m = sim.corrida.montarEntrada({ crescimento: opcoes.crescimento });
     if (!m) continue;
-    const { projecao } = projetar({ ...m.entrada, hiper: opcoes.hiper }, 2000, 42);
+    const { projecao } = projetar({ ...m.entrada, hiper: { ...m.entrada.hiper, ...opcoes.hiper } }, 2000, 42);
     if (!projecao.disponivel) continue;
     const linha: Linha = { pst: t.percentualSecoes, ne: ne ? neA / ne : 0, obs: {}, proj: {}, p2t: projecao.probSegundoTurno };
     for (const n of principais) {
@@ -105,15 +118,29 @@ function imprimirLinhas(sim: Simulador, m: Metricas) {
 const resumo = (m: Metricas) =>
   `${(100 * m.erroInicio).toFixed(2).padStart(5)}    | ${(100 * m.erroTodos).toFixed(2).padStart(5)} | ${(100 * m.erroVantagem).toFixed(2).padStart(5)} | ${(100 * m.cob80).toFixed(0).padStart(3)}% | ${(100 * m.cob95).toFixed(0).padStart(3)}%`;
 
-const modo = process.argv.find((a) => ['grade', 'ordem', 'crescimento'].includes(a));
+const modo = process.argv.find((a) => ['grade', 'ordem', 'crescimento', 'calibrar'].includes(a));
 
-if (modo === 'crescimento') {
+if (modo === 'calibrar') {
+  // escala as incertezas estruturais (choques e efeitos regionais) e mede a cobertura nos 3 cenários de ordem
+  console.log('escala | erro<30% | erro  | vant. | c80  | c95   (média dos 3 cenários de ordem)');
+  const sims = CENARIOS.map((c) => ({ c, sim: novoSim(c.atrasos) }));
+  for (const k of [1, 0.6, 0.4, 0.3, 0.2, 0.15]) {
+    const hiper = {
+      sigmaExtrap: HIPER_PADRAO.sigmaExtrap * k, sigmaSemDados: HIPER_PADRAO.sigmaSemDados * k,
+      sigmaMacro: HIPER_PADRAO.sigmaMacro * k, sigmaUf: HIPER_PADRAO.sigmaUf * k, sigmaRi: HIPER_PADRAO.sigmaRi * k,
+    };
+    const ms = sims.map(({ c, sim }) => avaliar(sim, c.minutos, { crescimento: false, hiper }));
+    const med = (f: (m: Metricas) => number) => ms.reduce((a, m) => a + f(m), 0) / ms.length;
+    console.log(`${k.toFixed(2).padStart(5)}  | ${(100 * med((m) => m.erroInicio)).toFixed(2).padStart(5)}    | ${(100 * med((m) => m.erroTodos)).toFixed(2).padStart(5)} | ${(100 * med((m) => m.erroVantagem)).toFixed(2).padStart(5)} | ${(100 * med((m) => m.cob80)).toFixed(0).padStart(3)}% | ${(100 * med((m) => m.cob95)).toFixed(0).padStart(3)}%  ` +
+      ms.map((m) => `[${(100 * m.cob95).toFixed(0)}%]`).join(' '));
+  }
+} else if (modo === 'crescimento') {
   console.log('A/B — variável "crescimento do eleitorado" (2022 ÷ 2018 no backtest; 2026 ÷ 2022 ao vivo)');
   console.log('Erros em pontos percentuais: média dos 4 principais (<30% apurado | todos os pontos) e da vantagem 1º−2º\n');
   console.log('cenário                          | variante        | erro<30% | erro  | vant. | c80  | c95');
   const acum = { sem: { ini: 0, todos: 0, vant: 0 }, com: { ini: 0, todos: 0, vant: 0 } };
   for (const c of CENARIOS) {
-    const sim = new Simulador(municipios, p2022, bases, () => {}, c.atrasos);
+    const sim = novoSim(c.atrasos);
     const sem = avaliar(sim, c.minutos, { crescimento: false });
     const com = avaliar(sim, c.minutos, { crescimento: true });
     console.log(`${c.nome.padEnd(32)} | sem crescimento | ${resumo(sem)}`);
@@ -128,13 +155,13 @@ if (modo === 'crescimento') {
   console.log(`                     com: erro<30% ${(100 * acum.com.ini).toFixed(2)} · erro ${(100 * acum.com.todos).toFixed(2)} · vantagem ${(100 * acum.com.vant).toFixed(2)} p.p.`);
 } else if (modo === 'ordem') {
   for (const c of CENARIOS.slice(1)) {
-    const sim = new Simulador(municipios, p2022, bases, () => {}, c.atrasos);
+    const sim = novoSim(c.atrasos);
     const m = avaliar(sim, c.minutos, { crescimento: sim.corrida.usarCrescimento });
     console.log(`\n${c.nome}`);
     imprimirLinhas(sim, m);
   }
 } else if (modo === 'grade') {
-  const sim = new Simulador(municipios, p2022, bases, () => {});
+  const sim = novoSim();
   console.log('δ     σβ    σext  | erro<30% | erro  | vant. | c80  | c95');
   for (const delta of [0.06, 0.08, 0.1]) {
     for (const sigmaBeta of [0.04, 0.06, 0.1]) {
@@ -145,9 +172,9 @@ if (modo === 'crescimento') {
     }
   }
 } else {
-  const sim = new Simulador(municipios, p2022, bases, () => {});
-  console.log(`Backtest — 1º turno 2022 com bases ${ANOS_BASE_SIMULACAO.join(' e ')}`);
-  console.log(`hiperparâmetros: ${JSON.stringify(HIPER_PADRAO)} · crescimento do eleitorado: ${sim.corrida.usarCrescimento ? 'sim' : 'não'}\n`);
+  const sim = novoSim();
+  console.log(`Backtest — ${TURNO}º turno 2022 com bases ${cfg.bases.join(' e ')}`);
+  console.log(`hiperparâmetros: ${JSON.stringify({ ...HIPER_PADRAO, ...HIPER_POR_TURNO[TURNO] })}\n`);
   const t0 = performance.now();
   const m = avaliar(sim, CENARIOS[0].minutos, { crescimento: sim.corrida.usarCrescimento });
   imprimirLinhas(sim, m);

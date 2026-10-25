@@ -15,11 +15,11 @@ interface ConfigEleicoes {
   pl: { cd: string; c: string; dt: string; e: { cd: string; t: string; abr: { cd: string; cp: { cd: string }[] }[] }[] }[];
 }
 
-const REBUSCA_PARCIAL_MS = 60_000;
+const REBUSCA_PARCIAL_MS = 30_000;
 const paraData = (dt: string) => { const [d, m, a] = dt.split('/'); return `${a}-${m}-${d}`; };
 
-/** Descobre na configuração oficial a eleição presidencial mais recente do ciclo (e a estadual do mesmo dia). */
-export async function descobrirEleicao(cliente: ClienteTse): Promise<{ info: CorridaInfo; pleito: string; eleicaoEstadual: number | null }> {
+/** Descobre na configuração oficial a eleição presidencial mais recente do ciclo (1º ou 2º turno). */
+export async function descobrirEleicao(cliente: ClienteTse): Promise<{ info: CorridaInfo; pleito: string }> {
   const r = await cliente.json<ConfigEleicoes>(caminhos.config(URL_TSE), false);
   if (r.tipo !== 'novo') throw new Error('configuração indisponível');
   const hoje = new Date().toISOString().slice(0, 10);
@@ -32,10 +32,8 @@ export async function descobrirEleicao(cliente: ClienteTse): Promise<{ info: Cor
   if (!escolha) throw new Error(`nenhuma eleição presidencial do ciclo ${CICLO} na configuração`);
   const turno = Number(escolha.e.t) || 1;
   const eleicao = Number(escolha.e.cd);
-  const estadual = escolha.p.e.find((e) => temCargo(e, '3') || temCargo(e, '5'));
   return {
     pleito: `${escolha.p.dt} · eleição ${eleicao}`,
-    eleicaoEstadual: estadual ? Number(estadual.cd) : null,
     info: {
       id: `presidente-${eleicao}`,
       modo: 'ao-vivo',
@@ -48,6 +46,7 @@ export async function descobrirEleicao(cliente: ClienteTse): Promise<{ info: Cor
       maioriaAbsoluta: turno === 1,
       titulo: `Presidente · ${turno}º turno`,
       anoAnterior: 2022,
+      rotuloAnterior: turno === 2 ? '1º turno' : '2022',
     },
   };
 }
@@ -99,7 +98,7 @@ export class ColetorAoVivo {
 
   private async andamento(uf: string): Promise<AndamentoUnidade[]> {
     const url = caminhos.andamento(URL_TSE, CICLO, this.corrida.info.eleicao, uf);
-    const r = await this.cliente.json<TseAndamento>(url);
+    const r = await this.cliente.json<TseAndamento>(url, true, true);
     if (r.tipo === 'novo') this.ultimoAb.set(url, lerAndamento(r.dados));
     return this.ultimoAb.get(url) ?? [];
   }
@@ -110,7 +109,7 @@ export class ColetorAoVivo {
     const c = this.corrida;
     const { eleicao, cargo, abrangencia } = c.info;
     try {
-      const r = await this.cliente.json<TseUnificado>(caminhos.unificado(URL_TSE, CICLO, eleicao, abrangencia, cargo));
+      const r = await this.cliente.json<TseUnificado>(caminhos.unificado(URL_TSE, CICLO, eleicao, abrangencia, cargo), true, true);
       if (r.tipo === 'novo') {
         const ass = `${r.dados.dg}|${r.dados.hg}|${r.dados.s?.st}`;
         if (ass !== this.assinaturaNacional) { this.assinaturaNacional = ass; this.mudouEm = Date.now(); }
@@ -222,14 +221,28 @@ export class ColetorAoVivo {
     return mudou;
   }
 
+  /**
+   * Busca o resultado de um município. Se o arquivo vier atrás do andamento (cópia antiga da CDN),
+   * tenta de novo sem cache; se ainda assim estiver atrás, não marca como lido — volta no próximo ciclo.
+   */
   private async buscarMunicipio(uf: string, a: AndamentoUnidade): Promise<boolean> {
     try {
       const { eleicao, cargo } = this.corrida.info;
       const url = caminhos.unificado(URL_TSE, CICLO, eleicao, uf, cargo, a.codigo);
-      const r = await this.cliente.json<TseUnificado>(url, false);
-      this.buscado.set(a.codigo, { assinatura: a.assinatura, quando: Date.now() });
-      if (r.tipo !== 'novo') return false;
-      this.corrida.unidades.set(a.codigo, lerUnificado(r.dados).contagem);
+      let r = await this.cliente.json<TseUnificado>(url, false);
+      let contagem = r.tipo === 'novo' ? lerUnificado(r.dados).contagem : null;
+      if (!contagem || contagem.secoesTotalizadas < a.secoesTotalizadas) {
+        r = await this.cliente.json<TseUnificado>(url, false, true);
+        if (r.tipo === 'novo') contagem = lerUnificado(r.dados).contagem;
+      }
+      if (!contagem) return false;
+      const atual = this.corrida.unidades.get(a.codigo);
+      // nunca regride: uma cópia antiga não substitui dados mais novos
+      if (atual && contagem.secoesTotalizadas < atual.secoesTotalizadas) return false;
+      this.corrida.unidades.set(a.codigo, contagem);
+      if (contagem.secoesTotalizadas >= a.secoesTotalizadas) {
+        this.buscado.set(a.codigo, { assinatura: a.assinatura, quando: Date.now() });
+      }
       return true;
     } catch {
       return false;

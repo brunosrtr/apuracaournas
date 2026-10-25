@@ -65,7 +65,7 @@ export function Insights({ estado }: { estado: EstadoCorrida }) {
   };
 
   const cand = new Map(estado.candidatos.map((c) => [c.numero, c]));
-  const ano = estado.corrida.anoAnterior;
+  const ano = estado.corrida.rotuloAnterior;
   const atual = analises?.at(-1);
   const anterior = analises && analises.length > 1 ? analises[analises.length - 2] : undefined;
   const idsAnteriores = new Set(anterior?.insights.map((i) => i.id) ?? []);
@@ -77,7 +77,7 @@ export function Insights({ estado }: { estado: EstadoCorrida }) {
           <div>
             <h2 style={{ marginBottom: 4 }}>Insights da apuração</h2>
             <p className="muted" style={{ margin: 0, fontSize: 13.5 }}>
-              Gerados automaticamente a cada 5% de seções apuradas, comparando com {ano} <strong>nos mesmos municípios e na mesma proporção já apurada</strong>.
+              Gerados automaticamente a cada 5% de seções apuradas, comparando com {estado.corrida.turno === 2 ? 'o 1º turno' : ano} <strong>nos mesmos municípios e na mesma proporção já apurada</strong>.
               Assim a diferença reflete mudança de voto, não a ordem da apuração.
             </p>
           </div>
@@ -106,7 +106,7 @@ export function Insights({ estado }: { estado: EstadoCorrida }) {
       ) : (
         <>
           <section className="col-12 insights-grade">
-            {atual.insights.length === 0 && <div className="cartao vazio">Ainda não há diferenças relevantes em relação a {ano}.</div>}
+            {atual.insights.length === 0 && <div className="cartao vazio">Ainda não há diferenças relevantes em relação {estado.corrida.turno === 2 ? 'ao 1º turno' : `a ${ano}`}.</div>}
             {atual.insights.map((i) => (
               <Cartao key={i.id} i={i} cor={i.numero ? cand.get(i.numero)?.cor : undefined} novo={!!anterior && !idsAnteriores.has(i.id)} />
             ))}

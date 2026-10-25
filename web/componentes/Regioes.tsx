@@ -7,7 +7,7 @@ export function Regioes({ estado }: { estado: EstadoCorrida }) {
   const cand = new Map(estado.candidatos.map((c) => [c.numero, c]));
   const proj = estado.projecao?.disponivel ? estado.projecao : null;
   const porRegiao = new Map(proj?.regioes.map((r) => [r.codigo, r]) ?? []);
-  const ano = estado.corrida.anoAnterior;
+  const ano = estado.corrida.rotuloAnterior;
 
   return (
     <div className="grade">

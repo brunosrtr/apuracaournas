@@ -20,10 +20,10 @@ import { Modelo } from './componentes/Modelo.tsx';
 import { Validacao } from './componentes/Validacao.tsx';
 import { PainelEstado } from './componentes/PainelEstado.tsx';
 import { Atualizacao } from './componentes/Atualizacao.tsx';
-import { Partidos } from './componentes/Partidos.tsx';
+import { FrenteAFrente } from './componentes/FrenteAFrente.tsx';
 import { Insights } from './componentes/Insights.tsx';
 
-type Aba = 'insights' | 'estados' | 'partidos' | 'regioes' | 'municipios' | 'modelo' | 'validacao';
+type Aba = 'insights' | 'estados' | 'regioes' | 'municipios' | 'modelo' | 'validacao';
 const modoInicial = (): Modo => (location.hash.includes('simulacao') ? 'simulacao' : 'ao-vivo');
 
 export function App() {
@@ -98,6 +98,7 @@ export function App() {
 
   const chamada = useMemo(() => (estado ? calcularChamada(estado) : null), [estado]);
   const simulacao = modo === 'simulacao';
+  const segundoTurno = (estado?.corrida.turno ?? 1) === 2;
 
   const acaoSimulacao = (acao: string, params = '') => {
     api.simulacao(acao, params).then((s) => setStatus((st) => (st ? { ...st, simulacao: s } : st)));
@@ -105,17 +106,15 @@ export function App() {
 
   useEffect(() => {
     if (!simulacao && aba === 'validacao') setAba('estados');
-    if (simulacao && aba === 'partidos') setAba('estados');
   }, [simulacao, aba]);
 
   const abas: [Aba, string][] = [
     ['insights', 'Insights'],
     ['estados', 'Estados'],
-    ...(simulacao ? [] : [['partidos', 'Partidos · Governador e Senado'] as [Aba, string]]),
     ['regioes', 'Regiões'],
     ['municipios', 'Municípios'],
     ['modelo', 'Como funciona o modelo'],
-    ...(simulacao ? [['validacao', 'Validação (2022)'] as [Aba, string]] : []),
+    ...(simulacao ? [['validacao', `Validação (${status?.simulacao.corrida.turno ?? 2}º turno 2022)`] as [Aba, string]] : []),
   ];
 
   return (
@@ -151,23 +150,41 @@ export function App() {
               <Progresso estado={estado} agora={agora} />
             </section>
 
-            <Resumo estado={estado} />
-
-            <section className="cartao col-7">
-              <h2>Candidatos<span className="extra muted">{estado.projecao?.disponivel ? 'apurado · projeção com margem de erro (95%)' : 'apurado'}</span></h2>
-              <Candidatos estado={estado} />
-            </section>
-            <section className="cartao col-5">
-              <Mapa estado={estado} unidades={unidades} aoSelecionarUf={setUfPainel} />
-            </section>
-
-            <section className="cartao col-7">
-              <h2>Distribuição dos cenários simulados<span className="extra muted">fração final dos válidos</span></h2>
-              <Distribuicao estado={estado} />
-            </section>
-            <section className="cartao col-5">
-              <Cenarios estado={estado} />
-            </section>
+            {segundoTurno ? (
+              <>
+                <FrenteAFrente estado={estado} />
+                <section className="cartao col-7">
+                  <Mapa estado={estado} unidades={unidades} aoSelecionarUf={setUfPainel} />
+                </section>
+                <div className="col-5 pilha">
+                  <section className="cartao">
+                    <Cenarios estado={estado} />
+                  </section>
+                  <section className="cartao">
+                    <h2>Distribuição dos cenários<span className="extra muted">fração final dos válidos</span></h2>
+                    <Distribuicao estado={estado} />
+                  </section>
+                </div>
+              </>
+            ) : (
+              <>
+                <Resumo estado={estado} />
+                <section className="cartao col-7">
+                  <h2>Candidatos<span className="extra muted">{estado.projecao?.disponivel ? 'apurado · projeção com margem de erro (95%)' : 'apurado'}</span></h2>
+                  <Candidatos estado={estado} />
+                </section>
+                <section className="cartao col-5">
+                  <Mapa estado={estado} unidades={unidades} aoSelecionarUf={setUfPainel} />
+                </section>
+                <section className="cartao col-7">
+                  <h2>Distribuição dos cenários simulados<span className="extra muted">fração final dos válidos</span></h2>
+                  <Distribuicao estado={estado} />
+                </section>
+                <section className="cartao col-5">
+                  <Cenarios estado={estado} />
+                </section>
+              </>
+            )}
 
             <section className="cartao col-7">
               <h2>Evolução da apuração<span className="extra muted">eixo x: seções totalizadas</span></h2>
@@ -190,7 +207,6 @@ export function App() {
               </div>
               {aba === 'insights' && <Insights estado={estado} />}
               {aba === 'estados' && <Estados estado={estado} aoSelecionarUf={setUfPainel} />}
-              {aba === 'partidos' && !simulacao && <Partidos aoSelecionarUf={setUfPainel} />}
               {aba === 'regioes' && <Regioes estado={estado} />}
               {aba === 'municipios' && <Municipios estado={estado} unidades={unidades} />}
               {aba === 'modelo' && <Modelo estado={estado} />}

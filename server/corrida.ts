@@ -4,7 +4,7 @@ import type {
   Projecao, ProjecaoCandidato, ResumoRegional, Totais, UnidadeResumo, Validacao,
 } from '../shared/tipos.ts';
 import { referenciaDe, type Covariaveis } from './modelo/variaveis.ts';
-import { projecaoIndisponivel, type EntradaModelo, type UnidadeModelo } from './modelo/projecao.ts';
+import { projecaoIndisponivel, type EntradaModelo, type Hiper, type UnidadeModelo } from './modelo/projecao.ts';
 import type { ExecutorModelo } from './modelo/executor.ts';
 import { contagemVazia, type Unificado } from './tse/parse.ts';
 import { NOMES_REGIAO, NOMES_UF, REGIAO_POR_UF, SIMULACOES } from './config.ts';
@@ -32,6 +32,8 @@ export class Corrida {
   ultimoAcesso = Date.now();
   /** cenários de Monte Carlo por projeção */
   simulacoes = SIMULACOES;
+  /** hiperparâmetros do modelo (calibrados por turno) */
+  hiper: Partial<Hiper> = {};
   /** análises de insights (a cada 5% apurado e sob demanda) */
   insights: AnaliseInsights[] = [];
   proximoMarco = 0.05;
@@ -237,6 +239,7 @@ export class Corrida {
         maioriaAbsoluta: this.info.maioriaAbsoluta,
         vagas: this.info.vagas,
         baseHistorica: cov.descricao,
+        hiper: this.hiper,
       },
     };
   }

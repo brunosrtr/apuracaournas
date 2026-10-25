@@ -3,7 +3,9 @@ import { fmtPct, fmtPP, titulo } from '../formato.ts';
 
 /** Variação em relação à eleição anterior, para candidatos do mesmo partido (ou o mesmo candidato). */
 export function Comparacao({ estado }: { estado: EstadoCorrida }) {
-  const ano = estado.corrida.anoAnterior;
+  const ano = estado.corrida.rotuloAnterior;
+  // no 2º turno os candidatos são os mesmos do 1º: a coluna de equivalente seria redundante
+  const t2 = estado.corrida.turno === 2;
   const n = estado.nacional;
   const cand = new Map(estado.candidatos.map((c) => [c.numero, c]));
   const proj = new Map(estado.projecao?.disponivel ? estado.projecao.candidatos.map((c) => [c.numero, c]) : []);
@@ -12,7 +14,7 @@ export function Comparacao({ estado }: { estado: EstadoCorrida }) {
 
   return (
     <>
-      <h2>Comparação com {ano}<span className="extra muted">mesmo candidato ou mesmo partido</span></h2>
+      <h2>Comparação com {t2 ? 'o 1º turno' : ano}<span className="extra muted">{t2 ? 'mesmos candidatos, mesmos municípios' : 'mesmo candidato ou mesmo partido'}</span></h2>
       {!pares.length ? (
         <div className="vazio">Nenhum candidato com equivalente direto em {ano}.</div>
       ) : (
@@ -21,12 +23,12 @@ export function Comparacao({ estado }: { estado: EstadoCorrida }) {
             <thead>
               <tr>
                 <th>Candidato</th>
-                <th>Equivalente em {ano}</th>
+                {!t2 && <th>Equivalente em {ano}</th>}
                 <th className="direita" title="Fração atual nos municípios já apurados">Apurado agora</th>
                 <th className="direita" title={`Fração em ${ano} nos mesmos municípios, na mesma proporção já apurada`}>{ano} nos mesmos municípios</th>
                 <th className="direita">Variação</th>
                 <th className="direita">Projeção final</th>
-                <th className="direita">Resultado final {ano}</th>
+                <th className="direita">{t2 ? 'Final do 1º turno' : `Resultado final ${ano}`}</th>
                 <th className="direita">Variação projetada</th>
               </tr>
             </thead>
@@ -40,7 +42,7 @@ export function Comparacao({ estado }: { estado: EstadoCorrida }) {
                 return (
                   <tr key={atual}>
                     <td><span className="tag"><i style={{ background: c?.cor }} />{titulo(c?.nome ?? atual)}</span> <span className="muted">{c?.partido}</span></td>
-                    <td className="muted">{titulo(estado.nomesAnteriores[anterior] ?? anterior)} ({anterior})</td>
+                    {!t2 && <td className="muted">{titulo(estado.nomesAnteriores[anterior] ?? anterior)} ({anterior})</td>}
                     <td className="direita num">{Number.isFinite(obs) ? fmtPct(obs, 1) : '—'}</td>
                     <td className="direita num">{mesmos !== undefined && n.validos > 0 ? fmtPct(mesmos, 1) : '—'}</td>
                     <td className="direita num"><Delta v={Number.isFinite(obs) && mesmos !== undefined && n.validos > 0 ? obs - mesmos : null} /></td>

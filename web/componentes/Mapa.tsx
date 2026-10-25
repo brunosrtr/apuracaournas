@@ -3,6 +3,7 @@ import { geoArea, geoMercator, geoPath } from 'd3-geo';
 import type { FeatureCollection, Geometry, Position } from 'geojson';
 import type { EstadoCorrida, UnidadeResumo } from '../../shared/tipos.ts';
 import { fmtCompacto, fmtPct, titulo } from '../formato.ts';
+import { BASE_API } from '../cliente.ts';
 
 type Malha = FeatureCollection<Geometry, { uf?: string; ibge?: string }>;
 const cacheGeo = new Map<string, Promise<Malha>>();
@@ -21,7 +22,7 @@ function corrigirOrientacao(m: Malha): Malha {
 function carregarGeo(chave: string): Promise<Malha> {
   let p = cacheGeo.get(chave);
   if (!p) {
-    p = fetch(chave === 'ufs' ? '/api/geo/ufs' : `/api/geo/mun/${chave}`).then((r) => r.json()).then(corrigirOrientacao);
+    p = fetch(BASE_API + (chave === 'ufs' ? '/api/geo/ufs' : `/api/geo/mun/${chave}`)).then((r) => r.json()).then(corrigirOrientacao);
     cacheGeo.set(chave, p);
   }
   return p;

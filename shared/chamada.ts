@@ -13,7 +13,7 @@ export function calcularChamada(e: EstadoCorrida): Chamada {
 
   if (t.secoesTotalizadas === 0) {
     return e.corrida.modo === 'simulacao'
-      ? { status: 'aguardando', titulo: 'Simulação pronta', detalhe: 'Pressione "Iniciar" para reapresentar a noite de 2 de outubro de 2022.' }
+      ? { status: 'aguardando', titulo: 'Simulação pronta', detalhe: `Pressione "Iniciar" para reapresentar a noite de ${e.corrida.turno === 2 ? '30' : '2'} de outubro de 2022.` }
       : { status: 'aguardando', titulo: 'Aguardando a divulgação', detalhe: 'O TSE divulga os primeiros resultados após o fechamento das urnas, às 17h (horário de Brasília).' };
   }
   if (e.matematico?.definido) {
@@ -51,12 +51,13 @@ export function calcularChamada(e: EstadoCorrida): Chamada {
   const eleitos = [...reais].sort((a, b) => b.probVitoria - a.probVitoria).slice(0, k);
   const menor = Math.min(...eleitos.map((c) => c.probVitoria));
   const nomes = eleitos.map((c) => nome(c.numero)).join(' e ');
-  const verbo = k > 1 ? 'eleitos' : 'eleito';
+  const verbo = k > 1 ? 'eleitos' : 'é eleito presidente';
+  const rotuloProb = k > 1 ? 'Probabilidade mínima' : 'Probabilidade';
   if (eleitos.length && menor >= CERTEZA && podeProjetar) {
-    return { status: 'projetado', titulo: `Projeção: ${nomes} ${verbo}`, detalhe: `Probabilidade mínima ${pct(menor)} · ${sufixo}` };
+    return { status: 'projetado', titulo: `Projeção: ${nomes} ${verbo}`, detalhe: `${rotuloProb} ${pct(menor)} · ${sufixo}` };
   }
   if (eleitos.length && menor >= TENDENCIA) {
-    return { status: 'provavel', titulo: `Tendência: ${nomes} ${verbo}`, detalhe: `Probabilidade mínima ${pct(menor)} · ${sufixo}` };
+    return { status: 'provavel', titulo: `Tendência: ${nomes} ${k > 1 ? 'eleitos' : 'vence'}`, detalhe: `${rotuloProb} ${pct(menor)} · ${sufixo}` };
   }
   return { status: 'indefinido', titulo: 'Disputa em aberto', detalhe: sufixo };
 }

@@ -44,7 +44,7 @@ export function Estados({ estado, aoSelecionarUf }: { estado: EstadoCorrida; aoS
               {cab('Apurado', 'apurado')}
               {principais.map((n) => <th key={n} className="direita">{nome(n)}: apurado → projeção</th>)}
               {cab('Líder projetado', 'margem')}
-              {comparado && <th className="direita" title={`${nome(comparado)} agora × ${estado.corrida.anoAnterior} nos mesmos municípios`}>{nome(comparado)} vs {estado.corrida.anoAnterior}</th>}
+              {comparado && <th className="direita" title={`${nome(comparado)} agora × ${estado.corrida.rotuloAnterior} nos mesmos municípios`}>{nome(comparado)} vs {estado.corrida.rotuloAnterior}</th>}
             </tr>
           </thead>
           <tbody>
@@ -87,7 +87,7 @@ export function Estados({ estado, aoSelecionarUf }: { estado: EstadoCorrida; aoS
         </table>
       </div>
       <p className="aviso">
-        Projeção estadual com margem de erro de 95% (± meia-largura do intervalo). A porcentagem ao lado do líder é a chance de ele terminar em 1º no estado.
+        Projeção estadual com margem de erro de 95% (± meia-largura do intervalo). A porcentagem ao lado do líder é a chance de ele vencer no estado.
       </p>
     </div>
   );
