@@ -44,7 +44,8 @@ export function App() {
   }, []);
   useEffect(() => {
     carregarStatus();
-    const t = setInterval(carregarStatus, 5_000);
+    // ao vivo o status também é recarregado a cada evento do servidor; isto é só a rede de segurança
+    const t = setInterval(carregarStatus, 20_000);
     return () => clearInterval(t);
   }, [carregarStatus]);
 
@@ -73,7 +74,8 @@ export function App() {
   const ultimaUnidades = useRef(0);
   const timerUnidades = useRef<number | null>(null);
   const carregarUnidades = useCallback((id: string, imediato = false) => {
-    const intervalo = id.startsWith('sim-') ? 2500 : 8000;
+    // o mapa por município é a maior resposta (~300 KB): ao vivo, no máximo a cada 30 s por visitante
+    const intervalo = id.startsWith('sim-') ? 2500 : 30_000;
     const espera = imediato ? 0 : Math.max(0, intervalo - (Date.now() - ultimaUnidades.current));
     if (timerUnidades.current) return;
     timerUnidades.current = window.setTimeout(() => {
@@ -99,7 +101,7 @@ export function App() {
     if (!corridaId || ev.id !== corridaId || ev.versao === versao.current) return;
     carregarEstado(corridaId);
     carregarUnidades(corridaId);
-    if (corridaId.startsWith('sim-')) carregarStatus();
+    carregarStatus();
   });
 
   const chamada = useMemo(() => (estado ? calcularChamada(estado) : null), [estado]);

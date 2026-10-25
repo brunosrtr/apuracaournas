@@ -46,13 +46,14 @@ export function Insights({ estado }: { estado: EstadoCorrida }) {
   useEffect(() => {
     setAnalises(null);
     carregar();
-    const t = setInterval(carregar, 20_000);
+    const t = setInterval(carregar, 60_000);
     return () => clearInterval(t);
   }, [carregar]);
 
-  // nova versão da apuração → confere se surgiu análise de um novo marco (no máximo a cada 5 s)
+  // nova versão da apuração → confere se surgiu análise de um novo marco (no máximo a cada 30 s;
+  // as análises só mudam a cada 10% apurado)
   useEffect(() => {
-    if (Date.now() - ultimaCarga.current > 5_000) carregar();
+    if (Date.now() - ultimaCarga.current > 30_000) carregar();
   }, [estado.versao, carregar]);
 
   const cand = new Map(estado.candidatos.map((c) => [c.numero, c]));
