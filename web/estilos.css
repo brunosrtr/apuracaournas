@@ -387,3 +387,7 @@ tr:hover td { background: var(--surface-2); }
   .faf-nome { font-size: 16px; }
   .faf-id .foto { width: 44px !important; height: 44px !important; }
 }
+@media (max-width: 640px) {
+  /* no celular, a porcentagem dos candidatos vem antes do total de seções apuradas */
+  .grade > .faf { order: -1; }
+}
