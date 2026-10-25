@@ -56,9 +56,12 @@ export const TURNO_SIMULACAO = Number(process.env.TURNO_SIMULACAO ?? 2);
  * Hiperparâmetros do modelo por turno (calibrados por backtest: npm run testar -- calibrar).
  * No 2º turno a base é o 1º turno da mesma eleição, e a relação entre os dois é muito estável:
  * mesmo com as incertezas estruturais em 15% das do 1º turno, a margem de 95% cobriu o resultado
- * real em 100% dos pontos dos 3 cenários de ordem. Usamos 30% (mais cauteloso).
+ * real em 100% dos pontos dos 3 cenários de ordem.
+ * Na noite de 25/10/2026 a escala de 30% se mostrou estreita: com 4% e 10% apurado a projeção
+ * (54,5% ± 1,3 e 52,6% ± 0,7) ficou fora do valor para onde convergiu (~51,7%). O valor central não
+ * depende da escala (51,7% de 0,3 a 1,0); só a margem. Usamos 60%, que cobriria esses pontos.
  */
-const ESCALA_2T = 0.3;
+const ESCALA_2T = 0.6;
 export const HIPER_POR_TURNO: Record<number, Partial<Hiper>> = {
   1: {},
   2: {

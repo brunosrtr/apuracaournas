@@ -190,7 +190,8 @@ Implementado em `server/modelo/projecao.ts`:
    grupo e divididos na proporção apurada.
 
 No 2º turno a base é muito mais próxima (o mesmo eleitorado votou três semanas antes), então os choques regionais da
-margem de erro são reduzidos para 30% dos do 1º turno. Essa escala foi calibrada no backtest abaixo
+margem de erro são reduzidos para 60% dos do 1º turno. A escala foi calibrada no backtest abaixo e ampliada (de 30%
+para 60%) na noite do 2º turno de 2026, quando a margem se mostrou estreita nas primeiras horas
 (`npm run testar -- calibrar`).
 
 ### Precisão no 2º turno (backtest: 2º turno de 2022 com o 1º turno de 2022 como base)
