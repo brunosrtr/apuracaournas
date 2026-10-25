@@ -3,3 +3,7 @@ dist/
 data/
 *.log
 .DS_Store
+
+# configuração de deploy com o endereço do servidor (não versionar)
+vercel.producao.json
+.vercel
