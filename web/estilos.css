@@ -384,8 +384,11 @@ tr:hover td { background: var(--surface-2); }
   .faf-chance { font-size: 12px; padding: 3px 9px; }
   .faf-chance-rotulo { display: none; }
   .faf-chance-curto { display: inline; }
-  .faf-nome { font-size: 16px; }
+  /* nome inteiro em até duas linhas, em vez de cortar ("Flavio Bols…") */
+  .faf-nome { font-size: 16px; white-space: normal; overflow-wrap: anywhere; }
   .faf-id .foto { width: 44px !important; height: 44px !important; }
+  /* mesma altura dos dois lados, para os números ficarem alinhados mesmo com o nome em duas linhas */
+  .faf-id { min-height: 58px; }
 }
 @media (max-width: 640px) {
   /* no celular, a porcentagem dos candidatos vem antes do total de seções apuradas */

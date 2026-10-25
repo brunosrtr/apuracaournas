@@ -22,8 +22,8 @@ export const CONCORRENCIA = Number(process.env.CONCORRENCIA ?? 8);
 /** Cenários de Monte Carlo por projeção (divididos entre as threads). */
 export const SIMULACOES = Number(process.env.SIMULACOES ?? 4000);
 /**
- * Produção (servidor público): ninguém controla a simulação, que é compartilhada por todos os
- * visitantes; ela roda sozinha uma vez ao subir o servidor e fica parada no resultado final.
+ * Produção (servidor público): a simulação de 2022 é compartilhada por todos os visitantes, então
+ * fica fora da interface, não roda e a API recusa comandos para ela.
  */
 export const MODO_PUBLICO = process.env.MODO_PUBLICO === '1';
 /** Origens autorizadas a chamar a API de outro domínio (ex.: a interface na Vercel). Lista separada por vírgulas ou "*". */

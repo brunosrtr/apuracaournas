@@ -19,26 +19,19 @@ export function ControlesSimulacao({ sim, aoAgir }: Props) {
       </div>
       <div className="relogio num">{sim.relogio?.split(' ')[1] ?? '17:00'}</div>
       <div className="trilha" aria-label={`Progresso ${Math.round(sim.progresso * 100)}%`}><div style={{ width: `${sim.progresso * 100}%` }} /></div>
-      {sim.controlavel ? (
-        <>
-          {sim.ativa ? (
-            <button className="botao primario" onClick={() => aoAgir('pausar')}>❚❚ Pausar</button>
-          ) : (
-            <button className="botao primario" onClick={() => aoAgir('iniciar')}>▶ {terminou ? 'Repetir' : sim.progresso > 0 ? 'Continuar' : 'Iniciar'}</button>
-          )}
-          <button className="botao" onClick={() => aoAgir('reiniciar')}>↺ Reiniciar</button>
-          <div className="segmentado" role="group" aria-label="Velocidade">
-            {VELOCIDADES.map((v) => (
-              <button key={v} aria-pressed={sim.velocidade === v} onClick={() => aoAgir('velocidade', `?v=${v}`)} title={`${v} minuto(s) simulado(s) por segundo`}>
-                {v < 1 ? '½' : v}×
-              </button>
-            ))}
-          </div>
-        </>
+      {sim.ativa ? (
+        <button className="botao primario" onClick={() => aoAgir('pausar')}>❚❚ Pausar</button>
       ) : (
-        // servidor público: a simulação é compartilhada, então só é exibida
-        <span className="muted" style={{ fontSize: 12.5 }}>{terminou ? 'Reapresentação completa' : 'Reapresentando…'}</span>
+        <button className="botao primario" onClick={() => aoAgir('iniciar')}>▶ {terminou ? 'Repetir' : sim.progresso > 0 ? 'Continuar' : 'Iniciar'}</button>
       )}
+      <button className="botao" onClick={() => aoAgir('reiniciar')}>↺ Reiniciar</button>
+      <div className="segmentado" role="group" aria-label="Velocidade">
+        {VELOCIDADES.map((v) => (
+          <button key={v} aria-pressed={sim.velocidade === v} onClick={() => aoAgir('velocidade', `?v=${v}`)} title={`${v} minuto(s) simulado(s) por segundo`}>
+            {v < 1 ? '½' : v}×
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

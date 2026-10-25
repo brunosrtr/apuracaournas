@@ -135,11 +135,6 @@ const simulador = new Simulador(
   { turno: TURNO_SIMULACAO, covariaveis: covariaveisPara(TURNO_SIMULACAO, cfgSim.bases) },
 );
 simulador.corrida.hiper = HIPER_POR_TURNO[TURNO_SIMULACAO];
-if (MODO_PUBLICO) {
-  // em produção a simulação é uma demonstração fixa: roda uma vez (~1 min) e para no resultado final
-  simulador.velocidade = 2;
-  simulador.iniciar();
-}
 
 function corrida(id: string): Corrida | null {
   if (id === 'simulacao' || id === simulador.corrida.info.id) return simulador.corrida;
@@ -305,7 +300,7 @@ const servidor = createServer(async (req, res) => {
         return enviarJsonCache(req, res, `${cr.info.id}:estado`, chave, () => cr.estado());
       }
       if (recurso === 'simulacao' && req.method === 'POST') {
-        if (MODO_PUBLICO) return enviarJson(req, res, { erro: 'Simulação somente leitura neste servidor' }, 403);
+        if (MODO_PUBLICO) return enviarJson(req, res, { erro: 'Simulação indisponível neste servidor' }, 403);
         if (a === 'iniciar') simulador.iniciar();
         else if (a === 'pausar') simulador.pausar();
         else if (a === 'reiniciar') simulador.reiniciar();

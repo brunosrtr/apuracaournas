@@ -48,6 +48,12 @@ export function App() {
     return () => clearInterval(t);
   }, [carregarStatus]);
 
+  // no servidor público a simulação não é oferecida: links antigos para ela caem no ao vivo
+  const comSimulacao = status?.simulacao.controlavel ?? false;
+  useEffect(() => {
+    if (status && !comSimulacao && modo === 'simulacao') setModo('ao-vivo');
+  }, [status, comSimulacao, modo]);
+
   const corridaId = modo === 'simulacao' ? status?.simulacao.corrida.id ?? null : status?.aoVivo.corrida?.id ?? null;
 
   useEffect(() => {
@@ -122,6 +128,7 @@ export function App() {
       <Cabecalho
         modo={modo}
         aoMudarModo={setModo}
+        comSimulacao={comSimulacao}
         estado={estado}
         conectado={conectado}
         agora={agora}

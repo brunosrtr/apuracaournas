@@ -47,7 +47,7 @@ líder precisa para vencer direto.
 andamento, o apurado e a projeção para Presidente naquele estado, a chance de cada candidato vencer ali e a comparação com o
 1º turno.
 
-**Simulação 2022:** reapresenta a noite do 2º turno de 2022 (30/10) usando o 1º turno de 2022 como base, para demonstrar o
+**Simulação 2022** (só ao rodar localmente; o servidor público não a oferece): reapresenta a noite do 2º turno de 2022 (30/10) usando o 1º turno de 2022 como base, para demonstrar o
 modelo e medir a precisão contra o resultado real. Com `TURNO_SIMULACAO=1`, reapresenta o 1º turno (2/10) com 2018 e 2014.
 
 ## Como rodar
@@ -108,7 +108,7 @@ abertos), por isso vai num host Docker. A interface é estática e pode ir para 
 2. Volume persistente montado em **`/app/data`** (base histórica, fotos e estado da apuração).
 3. Um domínio com HTTPS, por exemplo `https://api.seudominio.com`.
 4. Variáveis opcionais: `CORS_ORIGEM=https://seu-projeto.vercel.app` (o padrão `*` libera qualquer origem) e
-   `THREADS`. O `MODO_PUBLICO=1` já vem no Dockerfile: a simulação roda sozinha uma vez e ninguém consegue controlá-la.
+   `THREADS`. O `MODO_PUBLICO=1` já vem no Dockerfile: a simulação de 2022 sai da interface e a API não aceita comandos para ela.
 
 Na primeira subida o servidor baixa e prepara a base histórica (cerca de 15 s) antes de abrir a porta. Em teste local
 com o container limitado a 2 CPUs e 1,5 GB de RAM, 50 usuários simultâneos (eventos + estado + mapa a cada 3 s) tiveram
@@ -129,7 +129,7 @@ O próprio servidor também serve a interface completa no seu domínio. A Vercel
 | `SIMULACOES` | `4000` | Cenários de Monte Carlo por projeção |
 | `THREADS` | `4` | Threads do modelo ao vivo (a simulação usa outras 2) |
 | `TURNO_SIMULACAO` | `2` | Turno de 2022 reapresentado no modo simulação |
-| `MODO_PUBLICO` | — | `1` em produção: simulação somente leitura (o Dockerfile já define) |
+| `MODO_PUBLICO` | — | `1` em produção: sem a simulação de 2022 na interface (o Dockerfile já define) |
 | `CORS_ORIGEM` | `*` | Origens que podem chamar a API de outro domínio, separadas por vírgula |
 | `VITE_API_URL` | — | (build da interface) endereço do servidor quando a interface está em outro domínio |
 

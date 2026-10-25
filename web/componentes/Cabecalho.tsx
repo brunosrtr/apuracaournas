@@ -5,6 +5,8 @@ import { haQuanto } from '../formato.ts';
 interface Props {
   modo: Modo;
   aoMudarModo: (m: Modo) => void;
+  /** falso no servidor público: sem o seletor ao vivo / simulação */
+  comSimulacao: boolean;
   estado: EstadoCorrida | null;
   conectado: boolean;
   agora: number;
@@ -14,7 +16,7 @@ interface Props {
   extra?: ReactNode;
 }
 
-export function Cabecalho({ modo, aoMudarModo, estado, conectado, agora, tema, alternarTema, extra }: Props) {
+export function Cabecalho({ modo, aoMudarModo, comSimulacao, estado, conectado, agora, tema, alternarTema, extra }: Props) {
   const apurando = (estado?.totais.secoesTotalizadas ?? 0) > 0;
   let pilula;
   if (!conectado) pilula = <span className="pilula"><span className="ponto alerta" />Reconectando…</span>;
@@ -43,10 +45,12 @@ export function Cabecalho({ modo, aoMudarModo, estado, conectado, agora, tema, a
           </div>
         </div>
         {pilula}
-        <div className="segmentado" role="group" aria-label="Modo">
-          <button aria-pressed={modo === 'ao-vivo'} onClick={() => aoMudarModo('ao-vivo')}>Ao vivo 2026</button>
-          <button aria-pressed={modo === 'simulacao'} onClick={() => aoMudarModo('simulacao')}>Simulação 2022</button>
-        </div>
+        {comSimulacao && (
+          <div className="segmentado" role="group" aria-label="Modo">
+            <button aria-pressed={modo === 'ao-vivo'} onClick={() => aoMudarModo('ao-vivo')}>Ao vivo 2026</button>
+            <button aria-pressed={modo === 'simulacao'} onClick={() => aoMudarModo('simulacao')}>Simulação 2022</button>
+          </div>
+        )}
         <button className="botao-icone" onClick={alternarTema} aria-label={tema === 'escuro' ? 'Usar tema claro' : 'Usar tema escuro'} title="Alternar tema">
           {tema === 'escuro' ? (
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>

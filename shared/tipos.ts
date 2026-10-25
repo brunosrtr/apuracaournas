@@ -247,7 +247,7 @@ export interface StatusServidor {
     requisicoes: number;
   };
   simulacao: {
-    /** falso em produção: os controles ficam escondidos e a API recusa comandos */
+    /** falso no servidor público: a simulação não aparece na interface e a API recusa comandos */
     controlavel: boolean;
     ativa: boolean;
     relogio: string | null;
