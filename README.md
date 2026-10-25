@@ -149,8 +149,7 @@ O próprio servidor também serve a interface completa no seu domínio. A Vercel
 - Quando algo muda, a projeção é recalculada e o navegador é avisado na hora (Server-Sent Events). A tela se atualiza sozinha
   e mostra, numa barra fixa, a **data e hora da última atualização do TSE**, quando a projeção foi recalculada e a contagem
   até a próxima consulta.
-  No celular, essa barra dá lugar a uma versão compacta: a porcentagem de seções totalizadas, a hora do TSE e os avisos
-  de conexão.
+  No celular, logo abaixo dela aparece também a porcentagem de seções totalizadas, acima dos candidatos.
 - **Proteções:**
   - o TSE publica cada arquivo também numa versão assinada (`.jws`); o coletor confere qual das duas está mais recente e
     usa a assinada se ela estiver à frente;

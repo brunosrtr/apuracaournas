@@ -137,7 +137,7 @@ export function App() {
         extra={(
           <>
             <Atualizacao estado={estado} status={status} conectado={conectado} agora={agora} />
-            <ProgressoFixo estado={estado} conectado={conectado} agora={agora} />
+            <ProgressoFixo estado={estado} />
           </>
         )}
       />

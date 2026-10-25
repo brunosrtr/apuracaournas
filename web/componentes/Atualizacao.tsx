@@ -18,22 +18,16 @@ function minutosSemPublicar(t: Totais, agora: number) {
 }
 
 /**
- * Versão do celular da barra fixa: só a porcentagem de seções totalizadas e a hora do TSE, numa
- * linha, mantendo os avisos de conexão perdida e de TSE parado.
+ * No celular, a porcentagem de seções totalizadas fica no cabeçalho fixo (abaixo da faixa de
+ * atualização), acima dos candidatos.
  */
-export function ProgressoFixo({ estado, conectado, agora }: { estado: EstadoCorrida | null; conectado: boolean; agora: number }) {
+export function ProgressoFixo({ estado }: { estado: EstadoCorrida | null }) {
   if (!estado) return null;
   const t = estado.totais;
-  const paradoMin = estado.corrida.modo === 'ao-vivo' ? minutosSemPublicar(t, agora) : 0;
-  let direita;
-  if (!conectado) direita = <span className="atu-alerta">Reconectando…</span>;
-  else if (paradoMin >= 10) direita = <span className="atu-alerta">⚠ TSE sem dados novos há {paradoMin} min</span>;
-  else direita = <span className="num">{t.atualizadoEm ? `TSE ${t.atualizadoEm.split(' ')[1]?.slice(0, 5)}` : 'aguardando o TSE'}</span>;
   return (
-    <div className="progresso-fixo" role="status" aria-live="off">
+    <div className="progresso-fixo">
       <div className="pf-linha">
         <span><strong className="num">{fmtPct(t.percentualSecoes)}</strong> das seções totalizadas</span>
-        {direita}
       </div>
       <div className="pf-barra" role="progressbar" aria-valuenow={Math.round(t.percentualSecoes * 100)} aria-valuemin={0} aria-valuemax={100}>
         <div style={{ width: `${t.percentualSecoes * 100}%` }} />
