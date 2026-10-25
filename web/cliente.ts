@@ -15,7 +15,6 @@ export const api = {
   corrida: (id: string) => json<EstadoCorrida>(`/api/corrida/${id}`),
   unidades: (id: string) => json<UnidadeResumo[]>(`/api/corrida/${id}/unidades`),
   insights: (id: string) => json<{ analises: AnaliseInsights[] }>(`/api/insights/${id}`),
-  recalcularInsights: (id: string) => json<AnaliseInsights>(`/api/insights/${id}/recalcular`, { method: 'POST' }),
   simulacao: (acao: string, params = '') => json<StatusServidor['simulacao']>(`/api/simulacao/${acao}${params}`, { method: 'POST' }),
 };
 

@@ -35,7 +35,6 @@ function Cartao({ i, cor, novo }: { i: Insight; cor?: string; novo: boolean }) {
 export function Insights({ estado }: { estado: EstadoCorrida }) {
   const id = estado.corrida.modo === 'simulacao' ? 'simulacao' : 'ao-vivo';
   const [analises, setAnalises] = useState<AnaliseInsights[] | null>(null);
-  const [calculando, setCalculando] = useState(false);
   const [aberta, setAberta] = useState<number | null>(null);
   const ultimaCarga = useRef(0);
 
@@ -56,19 +55,13 @@ export function Insights({ estado }: { estado: EstadoCorrida }) {
     if (Date.now() - ultimaCarga.current > 5_000) carregar();
   }, [estado.versao, carregar]);
 
-  const recalcular = () => {
-    setCalculando(true);
-    api.recalcularInsights(id)
-      .then((a) => setAnalises((lista) => [...(lista ?? []), a]))
-      .catch(() => {})
-      .finally(() => setCalculando(false));
-  };
-
   const cand = new Map(estado.candidatos.map((c) => [c.numero, c]));
   const ano = estado.corrida.rotuloAnterior;
   const atual = analises?.at(-1);
   const anterior = analises && analises.length > 1 ? analises[analises.length - 2] : undefined;
   const idsAnteriores = new Set(anterior?.insights.map((i) => i.id) ?? []);
+  // próximo marco de 10% (as análises saem sozinhas; a aba recarrega a cada atualização da apuração)
+  const proximo = Math.floor(estado.totais.percentualSecoes * 10 + 1e-9) * 10 + 10;
 
   return (
     <div className="grade">
@@ -77,18 +70,16 @@ export function Insights({ estado }: { estado: EstadoCorrida }) {
           <div>
             <h2 style={{ marginBottom: 4 }}>Insights da apuração</h2>
             <p className="muted" style={{ margin: 0, fontSize: 13.5 }}>
-              Gerados automaticamente a cada 5% de seções apuradas, comparando com {estado.corrida.turno === 2 ? 'o 1º turno' : ano} <strong>nos mesmos municípios e na mesma proporção já apurada</strong>.
+              Gerados automaticamente a cada 10% de seções apuradas, comparando com {estado.corrida.turno === 2 ? 'o 1º turno' : ano} <strong>nos mesmos municípios e na mesma proporção já apurada</strong>.
               Assim a diferença reflete mudança de voto, não a ordem da apuração.
             </p>
           </div>
-          <button className="botao primario" onClick={recalcular} disabled={calculando || estado.totais.validos <= 0} style={{ background: 'var(--accent)', borderColor: 'var(--accent)' }}>
-            {calculando ? 'Calculando…' : '↻ Recalcular agora'}
-          </button>
         </div>
         {atual && (
           <div className="muted" style={{ fontSize: 12.5, marginTop: 10 }}>
             Análise exibida: <strong>{rotuloAnalise(atual)}</strong> · gerada {fmtDataHora(atual.criadoEm)}
             {atual.atualizadoTse && <> · dados do TSE de {fmtDataHoraTse(atual.atualizadoTse)}</>}
+            {proximo <= 100 && <> · próxima análise aos {proximo}%</>}
           </div>
         )}
       </section>
@@ -99,7 +90,7 @@ export function Insights({ estado }: { estado: EstadoCorrida }) {
         <div className="cartao col-12">
           <div className="vazio">
             {estado.totais.validos > 0
-              ? 'A primeira análise sai quando 5% das seções estiverem apuradas. Use "Recalcular agora" para gerar uma antes disso.'
+              ? 'A primeira análise sai sozinha quando 10% das seções estiverem apuradas.'
               : 'Os insights aparecem quando a apuração começar.'}
           </div>
         </div>

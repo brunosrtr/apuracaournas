@@ -265,7 +265,7 @@ export interface Chamada {
   detalhe: string;
 }
 
-// ------------------------------------------------------------ insights (a cada 5% apurado ou sob demanda)
+// ------------------------------------------------------------ insights (a cada 10% apurado)
 export type CategoriaInsight = 'nacional' | 'virada' | 'regiao' | 'estado' | 'municipio' | 'comparecimento' | 'projecao' | 'novos';
 
 export interface Insight {
@@ -282,7 +282,7 @@ export interface Insight {
 }
 
 export interface AnaliseInsights {
-  /** marco de 5% que gerou a análise (null = sob demanda) */
+  /** marco de 10% que gerou a análise (null = sob demanda, em versões antigas) */
   marco: number | null;
   pst: number;
   criadoEm: number;

@@ -6,7 +6,7 @@ import { gzipSync } from 'node:zlib';
 import { spawnSync } from 'node:child_process';
 import {
   BASES_AO_VIVO, CICLO, DIR_BASE, DIR_CACHE, DIR_DIST, DIR_GEO, HIPER_POR_TURNO, INTERVALO_COLETA_MS, PORTA,
-  SIMULACAO, THREADS, TURNO_SIMULACAO, URL_TSE, MODO_PUBLICO, CORS_ORIGEM,
+  SIMULACAO, THREADS, TURNO_SIMULACAO, URL_TSE, MODO_PUBLICO, CORS_ORIGEM, PASSO_INSIGHTS,
 } from './config.ts';
 import { ClienteTse } from './tse/cliente.ts';
 import { ColetorAoVivo, descobrirEleicao } from './tse/coletor.ts';
@@ -67,18 +67,18 @@ const projetar = (c: Corrida) => void c.projetar(
   () => { verificarMarco(c); notificar(c); },
 );
 
-/** A cada 5% de seções totalizadas, gera e guarda uma análise de insights. */
+/** A cada 10% de seções totalizadas, gera e guarda uma análise de insights. */
 function verificarMarco(c: Corrida) {
   const pst = c.totais.percentualSecoes;
   if (pst + 1e-9 < c.proximoMarco) return;
-  const marco = Math.min(1, Math.round(Math.floor((pst + 1e-9) / 0.05) * 5) / 100);
+  const marco = Math.min(1, Math.round(Math.floor((pst + 1e-9) / PASSO_INSIGHTS) * PASSO_INSIGHTS * 100) / 100);
   try {
     c.insights.push(gerarInsights(c, marco, c.insights.at(-1)));
     if (c.insights.length > 40) c.insights.shift();
   } catch (e) {
     console.error('Falha ao gerar insights:', e);
   }
-  c.proximoMarco = marco + 0.05;
+  c.proximoMarco = marco + PASSO_INSIGHTS;
 }
 
 const cliente = new ClienteTse();
@@ -197,9 +197,6 @@ function aplicarCors(req: IncomingMessage, res: ServerResponse) {
   }
 }
 
-/** "Recalcular agora" é caro: no máximo uma análise nova a cada 20 s por disputa. */
-const ultimoRecalculo = new Map<string, number>();
-
 function enviarJson(req: IncomingMessage, res: ServerResponse, dados: unknown, codigo = 200) {
   const corpo = Buffer.from(JSON.stringify(dados));
   const gzip = /\bgzip\b/.test(String(req.headers['accept-encoding'] ?? '')) && corpo.length > 2048;
@@ -272,15 +269,6 @@ const servidor = createServer(async (req, res) => {
       if (recurso === 'insights' && a) {
         const cr = corrida(a);
         if (!cr) return enviarJson(req, res, { erro: 'Disputa não encontrada' }, 404);
-        if (b === 'recalcular' && req.method === 'POST') {
-          const ultima = cr.insights.at(-1);
-          if (ultima && Date.now() - (ultimoRecalculo.get(cr.info.id) ?? 0) < 20_000) return enviarJson(req, res, ultima);
-          ultimoRecalculo.set(cr.info.id, Date.now());
-          const analise = gerarInsights(cr, null, ultima);
-          cr.insights.push(analise);
-          if (cr.insights.length > 40) cr.insights.shift();
-          return enviarJson(req, res, analise);
-        }
         return enviarJson(req, res, { analises: cr.insights });
       }
       if (recurso === 'eventos') {

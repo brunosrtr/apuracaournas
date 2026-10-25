@@ -19,7 +19,7 @@ import { Municipios } from './componentes/Municipios.tsx';
 import { Modelo } from './componentes/Modelo.tsx';
 import { Validacao } from './componentes/Validacao.tsx';
 import { PainelEstado } from './componentes/PainelEstado.tsx';
-import { Atualizacao } from './componentes/Atualizacao.tsx';
+import { Atualizacao, ProgressoFixo } from './componentes/Atualizacao.tsx';
 import { FrenteAFrente } from './componentes/FrenteAFrente.tsx';
 import { Insights } from './componentes/Insights.tsx';
 
@@ -134,7 +134,12 @@ export function App() {
         agora={agora}
         tema={tema}
         alternarTema={alternarTema}
-        extra={<Atualizacao estado={estado} status={status} conectado={conectado} agora={agora} />}
+        extra={(
+          <>
+            <Atualizacao estado={estado} status={status} conectado={conectado} agora={agora} />
+            <ProgressoFixo estado={estado} conectado={conectado} agora={agora} />
+          </>
+        )}
       />
 
       {erro && <div className="chamada indefinido"><div><h3>{erro}</h3><p>Verifique se o servidor (npm start) está rodando.</p></div></div>}

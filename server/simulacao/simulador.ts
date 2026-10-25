@@ -10,7 +10,7 @@ import { Corrida } from '../corrida.ts';
 import { Aleatorio } from '../modelo/algebra.ts';
 import { montarCovariaveis, type Covariaveis } from '../modelo/variaveis.ts';
 import { atribuirCores } from '../../shared/cores.ts';
-import { REGIAO_POR_UF } from '../config.ts';
+import { PASSO_INSIGHTS, REGIAO_POR_UF } from '../config.ts';
 import type { BasePresidente, Candidato, Contagem, CorridaInfo, MunicipioBase, RegistroHistorico } from '../../shared/tipos.ts';
 
 /** minutos após as 17h em que cada macrorregião começa a ser totalizada (padrão parecido com 2022) */
@@ -161,7 +161,7 @@ export class Simulador {
     this.corrida.porUnidade = {};
     this.corrida.validacao = { final: this.corrida.verdade ?? {}, pontos: [] };
     this.corrida.insights = [];
-    this.corrida.proximoMarco = 0.05;
+    this.corrida.proximoMarco = PASSO_INSIGHTS;
   }
 
   get duracaoTotal() { return this.fim; }

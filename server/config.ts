@@ -28,6 +28,8 @@ export const SIMULACOES = Number(process.env.SIMULACOES ?? 4000);
 export const MODO_PUBLICO = process.env.MODO_PUBLICO === '1';
 /** Origens autorizadas a chamar a API de outro domínio (ex.: a interface na Vercel). Lista separada por vírgulas ou "*". */
 export const CORS_ORIGEM = process.env.CORS_ORIGEM ?? '*';
+/** Uma análise de insights a cada 10% de seções totalizadas (10%, 20%, …, 100%). */
+export const PASSO_INSIGHTS = 0.1;
 /** Threads usadas pelo modelo. */
 export const THREADS = Math.max(1, Math.min(Number(process.env.THREADS ?? 4), availableParallelism() - 1));
 

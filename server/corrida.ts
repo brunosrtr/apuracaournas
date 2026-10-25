@@ -7,7 +7,7 @@ import { referenciaDe, type Covariaveis } from './modelo/variaveis.ts';
 import { projecaoIndisponivel, type EntradaModelo, type Hiper, type UnidadeModelo } from './modelo/projecao.ts';
 import type { ExecutorModelo } from './modelo/executor.ts';
 import { contagemVazia, type Unificado } from './tse/parse.ts';
-import { NOMES_REGIAO, NOMES_UF, REGIAO_POR_UF, SIMULACOES } from './config.ts';
+import { NOMES_REGIAO, NOMES_UF, PASSO_INSIGHTS, REGIAO_POR_UF, SIMULACOES } from './config.ts';
 
 const MAX_HISTORICO = 800;
 const OUTROS = 'outros';
@@ -34,9 +34,9 @@ export class Corrida {
   simulacoes = SIMULACOES;
   /** hiperparâmetros do modelo (calibrados por turno) */
   hiper: Partial<Hiper> = {};
-  /** análises de insights (a cada 5% apurado e sob demanda) */
+  /** análises de insights (a cada 10% apurado) */
   insights: AnaliseInsights[] = [];
-  proximoMarco = 0.05;
+  proximoMarco = PASSO_INSIGHTS;
   /**
    * Usa o crescimento do eleitorado (atual ÷ eleição-base) também como variável de preferência.
    * Desligado: no backtest (npm run testar -- crescimento) ficou neutro — erro médio 1,20 → 1,22 p.p.
@@ -95,7 +95,8 @@ export class Corrida {
     this.historico = d.historico ?? [];
     this.unidades = new Map(d.unidades);
     this.insights = d.insights ?? [];
-    this.proximoMarco = d.proximoMarco ?? 0.05;
+    // estado salvo com outro passo (ex.: 5%) é alinhado ao próximo múltiplo de 10%
+    this.proximoMarco = Math.max(PASSO_INSIGHTS, Math.round(Math.ceil((d.proximoMarco ?? 0) / PASSO_INSIGHTS - 1e-9)) * PASSO_INSIGHTS);
     this.versao++;
     return true;
   }

@@ -30,7 +30,7 @@ No 1º turno, o painel principal mostra todos os candidatos, a chance de haver 2
 líder precisa para vencer direto.
 
 **Abas**
-- **Insights:** a cada 5% de seções apuradas, uma análise automática do que mudou em relação ao 1º turno (ou a 2022, no
+- **Insights:** a cada 10% de seções apuradas, uma análise automática do que mudou em relação ao 1º turno (ou a 2022, no
   1º turno), sempre nos mesmos municípios e na mesma proporção já apurada. Exemplo: "Rio Grande do Sul: PL com +12% de
   votos em relação ao 1º turno". A análise cobre:
   - variação nacional, por região, por estado e nas cidades grandes;
@@ -39,7 +39,7 @@ líder precisa para vencer direto.
   - candidatos novos;
   - distorção do parcial e estabilidade da projeção.
 
-  O botão **Recalcular agora** gera uma análise na hora, e as análises anteriores ficam no histórico.
+  A aba se atualiza sozinha quando sai uma análise nova, e as anteriores ficam no histórico.
 - **Estados** e **Regiões:** apurado, projeção com margem de erro, líder provável e variação em relação à eleição anterior.
 - **Municípios**, **Como funciona o modelo** (com diagnóstico ao vivo) e **Validação** (no modo simulação).
 
@@ -149,6 +149,8 @@ O próprio servidor também serve a interface completa no seu domínio. A Vercel
 - Quando algo muda, a projeção é recalculada e o navegador é avisado na hora (Server-Sent Events). A tela se atualiza sozinha
   e mostra, numa barra fixa, a **data e hora da última atualização do TSE**, quando a projeção foi recalculada e a contagem
   até a próxima consulta.
+  No celular, essa barra dá lugar a uma versão compacta: a porcentagem de seções totalizadas, a hora do TSE e os avisos
+  de conexão.
 - **Proteções:**
   - o TSE publica cada arquivo também numa versão assinada (`.jws`); o coletor confere qual das duas está mais recente e
     usa a assinada se ela estiver à frente;
@@ -261,7 +263,7 @@ server/
   index.ts             servidor HTTP: API, eventos (SSE), fotos, persistência, arquivos estáticos
   config.ts            parâmetros e constantes
   corrida.ts           estado de cada eleição (apuração, projeção, histórico, resumos por UF/região)
-  insights.ts          análises automáticas a cada 5% apurado
+  insights.ts          análises automáticas a cada 10% apurado
   tse/                 cliente HTTP (JSON/JWS, cache), leitura dos arquivos do TSE, coletor incremental
   modelo/              projeção (ajuste + Monte Carlo + consolidação), variáveis históricas, threads, backtest
   simulacao/           reapresentação da apuração de 2022 (1º ou 2º turno)
